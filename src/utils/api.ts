@@ -68,7 +68,7 @@ interface OrderStatusResult {
 
 const BACKEND_BASE_URL =
   (import.meta.env.VITE_BACKEND_URL as string | undefined)?.trim() ||
-  "https://batman-hush-backend.onrender.com";
+  "https://daredevilback.onrender.com";
 
 interface RawService {
   service?: string | number;
