@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.tsx";
 import { LoginPage } from "./pages/LoginPage.tsx";
+import { supabase } from "./lib/supabase.ts";
 import { useState, useEffect } from "react";
 const STORAGE_KEY = "gotham-access-key";
 const STORAGE_FP = "gotham-fingerprint";
@@ -16,23 +17,38 @@ function Root() {
     checkAuth();
   }, []);
 
-    const checkAuth = async () => {
+      const checkAuth = async () => {
     try {
       const savedKey = localStorage.getItem(STORAGE_KEY);
 
-      // 🔥 Simple check: if key exists in localStorage, user is authenticated
-      // Key was already validated against Supabase when first entered
-      // No need to re-verify every time — localStorage is the source of truth
-      if (savedKey && savedKey.trim().length > 0) {
-        setAuthState("authenticated");
+      // No key in localStorage — show login
+      if (!savedKey || !savedKey.trim()) {
+        setAuthState("unauthenticated");
         return;
       }
 
-      setAuthState("unauthenticated");
+      // 🔥 Verify key still exists and is active in Supabase
+      // This catches: deleted keys, revoked keys
+      const { data, error } = await supabase
+        .from("access_keys")
+        .select("is_active")
+        .eq("key", savedKey)
+        .single();
+
+      if (error || !data || !data.is_active) {
+        // Key deleted or revoked — clear localStorage and block
+        localStorage.removeItem(STORAGE_KEY);
+        setAuthState("unauthenticated");
+        return;
+      }
+
+      // Key still valid — let them in
+      setAuthState("authenticated");
 
     } catch (err) {
       console.error("Auth check failed:", err);
-      // 🔥 Even on error, if key exists locally, let them in
+      // 🔥 On network error — still let them in
+      // Dont block users just because Supabase is slow
       const savedKey = localStorage.getItem(STORAGE_KEY);
       if (savedKey && savedKey.trim().length > 0) {
         setAuthState("authenticated");
