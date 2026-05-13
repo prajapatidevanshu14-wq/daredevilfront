@@ -16,6 +16,14 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
+  // 🔥 Auto-login: if key already saved in localStorage, go straight in
+  useState(() => {
+    const savedKey = localStorage.getItem(STORAGE_KEY);
+    if (savedKey && savedKey.trim().length > 0) {
+      onAuthenticated();
+    }
+  });
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedKey = keyInput.trim().toUpperCase();
