@@ -61,8 +61,8 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
       }
 
       // Step 4: Check fingerprint
-      if (data.fingerprint === null) {
-        // Key never used before — activate it for this browser
+            if (data.fingerprint === null) {
+        // 🔥 Key never used before — activate it ONE TIME ONLY
         const { error: updateError } = await supabase
           .from("access_keys")
           .update({
@@ -77,19 +77,9 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
           return;
         }
 
-        // Save to localStorage
+        // 🔥 Save to localStorage — this is now the permanent access token
+        // User will never need to enter key again on this browser
         localStorage.setItem(STORAGE_KEY, trimmedKey);
-        localStorage.setItem(STORAGE_FP, fingerprint);
-
-        setSuccess(true);
-        setTimeout(() => {
-          onAuthenticated();
-        }, 1500);
-
-      } else if (data.fingerprint === fingerprint) {
-        // Same browser — already activated, allow in
-        localStorage.setItem(STORAGE_KEY, trimmedKey);
-        localStorage.setItem(STORAGE_FP, fingerprint);
 
         setSuccess(true);
         setTimeout(() => {
@@ -97,9 +87,11 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
         }, 1500);
 
       } else {
-        // Different browser fingerprint — block
+        // 🔥 Key already used (fingerprint is set) — BLOCK completely
+        // Even same browser — key was already consumed
+        // User should already have it in localStorage if they used it here
         setError(
-          "This key is already activated on a different browser. Each key can only be used in one browser."
+          "This key has already been used. Each key is single-use only. If this is your browser, access should be automatic."
         );
         setLoading(false);
         return;
