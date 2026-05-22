@@ -79,6 +79,7 @@ function hydrateOrderDates(orders: CreatedOrder[]): CreatedOrder[] {
           shares: Number.isFinite(run?.shares) ? run.shares : 0,
           saves: Number.isFinite(run?.saves) ? run.saves : 0,
           comments: Number.isFinite(run?.comments) ? run.comments : 0,
+          reposts: Number.isFinite(run?.reposts) ? run.reposts : 0,
           cumulativeViews: Number.isFinite(run?.cumulativeViews)
             ? run.cumulativeViews
             : 0,
@@ -93,6 +94,9 @@ function hydrateOrderDates(orders: CreatedOrder[]): CreatedOrder[] {
             : 0,
           cumulativeComments: Number.isFinite(run?.cumulativeComments)
             ? run.cumulativeComments
+            : 0,
+          cumulativeReposts: Number.isFinite(run?.cumulativeReposts)
+            ? run.cumulativeReposts
             : 0,
         }))
       : [];
@@ -130,6 +134,13 @@ function hydrateOrderDates(orders: CreatedOrder[]): CreatedOrder[] {
       completedRuns: Number.isFinite(order?.completedRuns)
         ? order.completedRuns
         : 0,
+      engagement: {
+        likes: Number.isFinite(order?.engagement?.likes) ? order.engagement.likes : 0,
+        shares: Number.isFinite(order?.engagement?.shares) ? order.engagement.shares : 0,
+        saves: Number.isFinite(order?.engagement?.saves) ? order.engagement.saves : 0,
+        comments: Number.isFinite(order?.engagement?.comments) ? order.engagement.comments : 0,
+        reposts: Number.isFinite(order?.engagement?.reposts) ? order.engagement.reposts : 0,
+      },
       runStatuses: safeRunStatuses,
       runErrors: safeRunErrors,
       runRetries: order?.runRetries || [],
@@ -160,6 +171,14 @@ function hydrateBundles(bundles: Bundle[]): Bundle[] {
   return bundles.map((bundle) => ({
     ...bundle,
     apiId: bundle.apiId ?? "",
+    serviceIds: {
+      views: bundle.serviceIds?.views ?? "",
+      likes: bundle.serviceIds?.likes ?? "",
+      shares: bundle.serviceIds?.shares ?? "",
+      saves: bundle.serviceIds?.saves ?? "",
+      comments: bundle.serviceIds?.comments ?? "",
+      reposts: bundle.serviceIds?.reposts ?? "",
+    },
   }));
 }
 
@@ -587,6 +606,7 @@ export default function App() {
                 shares: bundle.shares,
                 saves: bundle.saves,
                 comments: bundle.comments,
+                reposts: bundle.reposts,
               },
             },
           ];
@@ -605,6 +625,7 @@ export default function App() {
                     shares: bundle.shares,
                     saves: bundle.saves,
                     comments: bundle.comments,
+                    reposts: bundle.reposts,
                   },
                 }
               : item
