@@ -1126,22 +1126,38 @@ function distributeByViewsProportional(
   runs: { views: number }[],
   targetTotal: number,
   minPerRun = 1,
-  preferredAvgPerActive = Math.max(minPerRun + 2, minPerRun * 2)
+  preferredAvgPerActive = Math.max(minPerRun + 2, minPerRun * 2),
+  maxPerRun = Number.POSITIVE_INFINITY
 ): number[] {
-  if (runs.length === 0 || targetTotal <= 0) return Array.from({ length: runs.length }, () => 0);
+  if (runs.length === 0 || targetTotal <= 0) {
+    return Array.from({ length: runs.length }, () => 0);
+  }
 
   const result = Array.from({ length: runs.length }, () => 0);
   const maxViews = Math.max(1, ...runs.map((r) => r.views || 0));
-  const maxActiveAllowed = Math.max(1, Math.min(runs.length, Math.floor(targetTotal / Math.max(1, minPerRun))));
-  const densityCap = Math.max(1, Math.min(maxActiveAllowed, Math.round(runs.length * 0.45)));
+  const maxActiveAllowed = Math.max(
+    1,
+    Math.min(runs.length, Math.floor(targetTotal / Math.max(1, minPerRun)))
+  );
+  const minActiveNeeded = Number.isFinite(maxPerRun)
+    ? Math.max(1, Math.ceil(targetTotal / Math.max(minPerRun, maxPerRun)))
+    : 1;
+  const densityCap = Math.max(
+    minActiveNeeded,
+    Math.min(maxActiveAllowed, Math.round(runs.length * 0.45))
+  );
 
   const targetActive = clamp(
     Math.round(targetTotal / Math.max(minPerRun + 1, preferredAvgPerActive)),
-    1,
+    minActiveNeeded,
     densityCap
   );
   const activeJitter = Math.max(1, Math.round(targetActive * 0.1));
-  const activeCount = clamp(targetActive + randomInt(-activeJitter, activeJitter), 1, densityCap);
+  const activeCount = clamp(
+    targetActive + randomInt(-activeJitter, activeJitter),
+    minActiveNeeded,
+    densityCap
+  );
 
   const weights = runs.map((run, i) => {
     const t = i / Math.max(1, runs.length - 1);
@@ -1154,29 +1170,48 @@ function distributeByViewsProportional(
   const selectedIndexes = selectEngagementRuns(runs.length, activeCount, weights);
   if (selectedIndexes.length === 0) return result;
 
-  const baselineTotal = selectedIndexes.length * minPerRun;
-  const remainder = Math.max(0, targetTotal - baselineTotal);
-  const selectedWeights = selectedIndexes.map((index) => Math.max(0.01, weights[index] * random(0.82, 1.24)));
-  const weightSum = selectedWeights.reduce((sum, value) => sum + value, 0);
-  const extrasRaw = selectedWeights.map((weight) => (weight / Math.max(0.01, weightSum)) * remainder);
-  const extras = allocateRounded(extrasRaw, remainder);
-  const values = extras.map((extra) => extra + minPerRun);
+  const values = Array.from({ length: selectedIndexes.length }, () => minPerRun);
+  let remaining = Math.max(0, targetTotal - selectedIndexes.length * minPerRun);
+  const selectedWeights = selectedIndexes.map((index) =>
+    Math.max(0.01, weights[index] * random(0.82, 1.24))
+  );
+
+  let guard = 0;
+  while (remaining > 0 && guard < 50000) {
+    const candidates = values
+      .map((value, index) => ({ value, index }))
+      .filter((item) => !Number.isFinite(maxPerRun) || item.value < maxPerRun)
+      .map((item) => item.index);
+
+    if (candidates.length === 0) break;
+
+    const candidateWeights = candidates.map((index) => selectedWeights[index]);
+    const pickedLocalIndex = candidates[pickWeightedIndex(candidateWeights)];
+    values[pickedLocalIndex] += 1;
+    remaining -= 1;
+    guard += 1;
+  }
 
   for (let i = 1; i < values.length; i += 1) {
     if (values[i] === values[i - 1]) {
-      if (Math.random() < 0.5 && values[i] > minPerRun) values[i] -= 1;
-      else values[i] += 1;
+      const canRaise = !Number.isFinite(maxPerRun) || values[i] < maxPerRun;
+      const canLower = values[i] > minPerRun;
+      if (canRaise && (!canLower || Math.random() < 0.5)) values[i] += 1;
+      else if (canLower) values[i] -= 1;
     }
   }
 
   let drift = targetTotal - values.reduce((sum, value) => sum + value, 0);
-  let guard = 0;
-  while (drift !== 0 && guard < 10000) {
+  guard = 0;
+  while (drift !== 0 && guard < 50000) {
     const pick = guard % values.length;
-    if (drift > 0) {
+    const canRaise = !Number.isFinite(maxPerRun) || values[pick] < maxPerRun;
+    const canLower = values[pick] > minPerRun;
+
+    if (drift > 0 && canRaise) {
       values[pick] += 1;
       drift -= 1;
-    } else if (values[pick] > minPerRun) {
+    } else if (drift < 0 && canLower) {
       values[pick] -= 1;
       drift += 1;
     }
@@ -1195,7 +1230,8 @@ function spreadDistributionToEligibleRuns(
   eligibleIndexes: number[],
   targetTotal: number,
   minPerRun = 10,
-  preferredAvgPerActive = Math.max(minPerRun + 4, minPerRun * 2)
+  preferredAvgPerActive = Math.max(minPerRun + 4, minPerRun * 2),
+  maxPerRun = 20
 ): number[] {
   const result = Array.from({ length: runs.length }, () => 0);
   if (targetTotal <= 0 || eligibleIndexes.length === 0) return result;
@@ -1205,7 +1241,8 @@ function spreadDistributionToEligibleRuns(
     subsetRuns,
     targetTotal,
     minPerRun,
-    preferredAvgPerActive
+    preferredAvgPerActive,
+    maxPerRun
   );
 
   eligibleIndexes.forEach((runIndex, index) => {
@@ -1380,7 +1417,7 @@ if (config.includeComments) {
 
   // any active engagement run should be >= 10; zero is allowed for skipped runs
   const likesRuns = config.includeLikes
-    ? distributeByViewsProportional(provisionalRuns, likesTotal, 10, 28)
+    ? distributeByViewsProportional(provisionalRuns, likesTotal, 10, 14, 20)
     : viewRuns.map(() => 0);
 
   const likeActiveIndexes = getActiveIndexes(likesRuns);
@@ -1398,11 +1435,11 @@ if (config.includeComments) {
     : fallbackEligibleIndexes.filter((_, index) => index % 2 === 1 || fallbackEligibleIndexes.length <= 3);
 
   const sharesRuns = config.includeShares
-    ? spreadDistributionToEligibleRuns(provisionalRuns, shareEligibleIndexes, sharesTotal, 10, 16)
+    ? spreadDistributionToEligibleRuns(provisionalRuns, shareEligibleIndexes, sharesTotal, 10, 14)
     : viewRuns.map(() => 0);
 
   const savesRuns = config.includeSaves
-    ? spreadDistributionToEligibleRuns(provisionalRuns, saveEligibleIndexes, savesTotal, 10, 14)
+    ? spreadDistributionToEligibleRuns(provisionalRuns, saveEligibleIndexes, savesTotal, 10, 12)
     : viewRuns.map(() => 0);
 
   const commentsBase = config.includeComments
@@ -1411,7 +1448,7 @@ if (config.includeComments) {
 
   const repostsTarget = config.includeReposts ? Math.max(10, Math.floor(likesTotal / 3)) : 0;
   const repostsRuns = config.includeReposts
-    ? spreadDistributionToEligibleRuns(provisionalRuns, repostEligibleIndexes, repostsTarget, 10, 14)
+    ? spreadDistributionToEligibleRuns(provisionalRuns, repostEligibleIndexes, repostsTarget, 10, 12)
     : viewRuns.map(() => 0);
   const commentsRuns = (() => {
   const result = Array.from({ length: commentsBase.length }, () => 0);
