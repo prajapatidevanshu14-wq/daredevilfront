@@ -46,11 +46,19 @@ export interface OrderConfig {
   includeShares: boolean;
   includeSaves: boolean;
   includeComments: boolean;
+  includeReposts: boolean;
   variancePercent: number;
   peakHoursBoost: boolean;
   quickPreset: QuickPatternPreset | null;
   delivery: DeliveryOption;
   minViewsPerRun: number;
+  manualRunCount?: number;
+  sharesMode?: RelativeCountMode;
+  savesMode?: RelativeCountMode;
+  repostsMode?: RelativeCountMode;
+  customSharesTotal?: number;
+  customSavesTotal?: number;
+  customRepostsTotal?: number;
 }
 
 // ============ RUN TYPES ============
@@ -66,11 +74,13 @@ export interface RunStep {
   shares: number;
   saves: number;
   comments: number;
+  reposts: number;
   cumulativeViews: number;
   cumulativeLikes: number;
   cumulativeShares: number;
   cumulativeSaves: number;
   cumulativeComments: number;
+  cumulativeReposts: number;
 }
 
 // Alias so both sites work
@@ -120,6 +130,15 @@ export interface Bundle {
     shares: string;
     saves: string;
     comments: string;
+    reposts: string;
+  };
+  serviceApis?: {
+    views?: string;
+    likes?: string;
+    shares?: string;
+    saves?: string;
+    comments?: string;
+    reposts?: string;
   };
 }
 
@@ -158,11 +177,12 @@ export interface CreatedOrder {
   patternType: PatternType;
   patternName: string;
   runs: RunStep[];
-  engagement: {
+    engagement: {
     likes: number;
     shares: number;
     saves: number;
     comments: number;
+    reposts: number;
   };
   serviceId: string;
   selectedAPI: string | null;
