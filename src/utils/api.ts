@@ -8,7 +8,7 @@ interface CreateOrderPayload {
   link: string;
   services: Partial<
     Record<
-      "views" | "likes" | "shares" | "saves" | "comments",
+      "views" | "likes" | "shares" | "saves" | "comments" | "reposts",
       {
         serviceId: string;
         runs: Array<{
