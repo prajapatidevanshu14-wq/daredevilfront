@@ -77,6 +77,7 @@ export function NewOrderPage({ apis, bundles, orders, prefillOrder, onCreateOrde
   const [includeLikes, setIncludeLikes] = useState((prefillOrder?.engagement.likes ?? 0) > 0);
   const [includeShares, setIncludeShares] = useState((prefillOrder?.engagement.shares ?? 0) > 0);
   const [includeSaves, setIncludeSaves] = useState((prefillOrder?.engagement.saves ?? 0) > 0);
+  const [includeReposts, setIncludeReposts] = useState((prefillOrder?.engagement.reposts ?? 0) > 0);
   const [customComments, setCustomComments] = useState("");
   const [includeComments, setIncludeComments] = useState(false);
   const [variancePercent, setVariancePercent] = useState(40);
@@ -96,7 +97,7 @@ export function NewOrderPage({ apis, bundles, orders, prefillOrder, onCreateOrde
   useEffect(() => {
     const fetchMinViews = async () => {
       try {
-        const backendUrl = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.trim().replace(/\/$/, "") || "https://iamsuperman-backend.onrender.com";
+        const backendUrl = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.trim().replace(/\/$/, "") || "https://daredevilback.onrender.com";
         const response = await fetch(`${backendUrl}/api/settings/min-views`);
         if (response.ok) {
           const data = await response.json();
@@ -126,6 +127,7 @@ export function NewOrderPage({ apis, bundles, orders, prefillOrder, onCreateOrde
       includeShares,
       includeSaves,
       includeComments,
+      includeReposts,
       variancePercent,
       peakHoursBoost,
       quickPreset,
@@ -139,7 +141,7 @@ export function NewOrderPage({ apis, bundles, orders, prefillOrder, onCreateOrde
     }),
     [
       postUrl, totalViews, startDelayHours, includeLikes, includeShares,
-      includeSaves, includeComments, variancePercent, peakHoursBoost,
+      includeSaves, includeComments, includeReposts, variancePercent, peakHoursBoost,
       quickPreset, delivery, customHours, minViewsPerRun,
     ]
   );
@@ -230,7 +232,7 @@ export function NewOrderPage({ apis, bundles, orders, prefillOrder, onCreateOrde
     setMinViewsPerRun(newValue);
     setUseClonedPlan(false);
     setSeed((current) => current + 1);
-    const backendUrl = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.trim().replace(/\/$/, "") || "https://iamsuperman-backend.onrender.com";
+    const backendUrl = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.trim().replace(/\/$/, "") || "https://daredevilback.onrender.com";
     fetch(`${backendUrl}/api/settings/min-views`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -420,6 +422,7 @@ export function NewOrderPage({ apis, bundles, orders, prefillOrder, onCreateOrde
           <GrowthGraph
             plan={safePlan}
             selectedPreset={quickPreset}
+            includeReposts={includeReposts}
             onApplyPreset={handleApplyPreset}
             onGenerate={handleGenerate}
           />
@@ -535,6 +538,7 @@ export function NewOrderPage({ apis, bundles, orders, prefillOrder, onCreateOrde
                 { label: "❤️ Likes", active: includeLikes, toggle: () => { setUseClonedPlan(false); setIncludeLikes(!includeLikes); }, activeClass: "border-pink-500 bg-pink-500/20 text-pink-300" },
                 { label: "🔄 Shares", active: includeShares, toggle: () => { setUseClonedPlan(false); setIncludeShares(!includeShares); }, activeClass: "border-blue-500 bg-blue-500/20 text-blue-300" },
                 { label: "💾 Saves", active: includeSaves, toggle: () => { setUseClonedPlan(false); setIncludeSaves(!includeSaves); }, activeClass: "border-purple-500 bg-purple-500/20 text-purple-300" },
+                { label: "🔁 Reposts", active: includeReposts, toggle: () => { setUseClonedPlan(false); setIncludeReposts(!includeReposts); }, activeClass: "border-cyan-500 bg-cyan-500/20 text-cyan-300" },
                 { label: "💬 Comments", active: includeComments, toggle: () => { setUseClonedPlan(false); setIncludeComments(!includeComments); }, activeClass: "border-pink-500 bg-pink-500/20 text-pink-300" },
               ].map((btn) => (
                 <button
@@ -593,26 +597,30 @@ export function NewOrderPage({ apis, bundles, orders, prefillOrder, onCreateOrde
                     const likesService = selApi.services.find(s => s.id === selBundle.serviceIds.likes);
                     const sharesService = selApi.services.find(s => s.id === selBundle.serviceIds.shares);
                     const savesService = selApi.services.find(s => s.id === selBundle.serviceIds.saves);
+                    const repostsService = selApi.services.find(s => s.id === selBundle.serviceIds.reposts);
                     const commentsService = selApi.services.find(s => s.id === selBundle.serviceIds.comments);
 
                     const totalViewsQty = safePlan.runs.reduce((sum, run) => sum + (run.views || 0), 0);
                     const totalLikesQty = safePlan.runs.reduce((sum, run) => sum + (run.likes || 0), 0);
                     const totalSharesQty = safePlan.runs.reduce((sum, run) => sum + (run.shares || 0), 0);
                     const totalSavesQty = safePlan.runs.reduce((sum, run) => sum + (run.saves || 0), 0);
+                    const totalRepostsQty = safePlan.runs.reduce((sum, run) => sum + (run.reposts || 0), 0);
                     const totalCommentsQty = safePlan.runs.reduce((sum, run) => sum + (run.comments || 0), 0);
 
                     const viewsRate = parseFloat(viewsService?.rate || "0");
                     const likesRate = parseFloat(likesService?.rate || "0");
                     const sharesRate = parseFloat(sharesService?.rate || "0");
                     const savesRate = parseFloat(savesService?.rate || "0");
+                    const repostsRate = parseFloat(repostsService?.rate || "0");
                     const commentsRate = parseFloat(commentsService?.rate || "0");
 
                     const viewsPrice = (totalViewsQty / 1000) * viewsRate;
                     const likesPrice = includeLikes ? (totalLikesQty / 1000) * likesRate : 0;
                     const sharesPrice = includeShares ? (totalSharesQty / 1000) * sharesRate : 0;
                     const savesPrice = includeSaves ? (totalSavesQty / 1000) * savesRate : 0;
+                    const repostsPrice = includeReposts ? (totalRepostsQty / 1000) * repostsRate : 0;
                     const commentsPrice = includeComments ? (totalCommentsQty / 1000) * commentsRate : 0;
-                    const total = viewsPrice + likesPrice + sharesPrice + savesPrice + commentsPrice;
+                    const total = viewsPrice + likesPrice + sharesPrice + savesPrice + repostsPrice + commentsPrice;
 
                     return (
                       <>
@@ -620,6 +628,7 @@ export function NewOrderPage({ apis, bundles, orders, prefillOrder, onCreateOrde
                         {includeLikes && totalLikesQty > 0 && <span className="text-[10px] text-gray-400">❤️₹{likesPrice.toFixed(0)}</span>}
                         {includeShares && totalSharesQty > 0 && <span className="text-[10px] text-gray-400">🔄₹{sharesPrice.toFixed(0)}</span>}
                         {includeSaves && totalSavesQty > 0 && <span className="text-[10px] text-gray-400">💾₹{savesPrice.toFixed(0)}</span>}
+                        {includeReposts && totalRepostsQty > 0 && <span className="text-[10px] text-gray-400">🔁₹{repostsPrice.toFixed(0)}</span>}
                         {includeComments && totalCommentsQty > 0 && <span className="text-[10px] text-gray-400">💬₹{commentsPrice.toFixed(0)}</span>}
                         <div className="ml-auto rounded-md border border-yellow-500/40 bg-yellow-500/10 px-2 py-1">
                           <span className="text-sm font-bold text-yellow-400">₹{total.toFixed(0)}</span>
@@ -673,9 +682,11 @@ export function NewOrderPage({ apis, bundles, orders, prefillOrder, onCreateOrde
             const likesServiceId = selBundle.serviceIds.likes.trim();
             const sharesServiceId = selBundle.serviceIds.shares.trim();
             const savesServiceId = selBundle.serviceIds.saves.trim();
+            const repostsServiceId = selBundle.serviceIds.reposts?.trim();
             if (includeLikes && !likesServiceId) { setCreateError("Bundle has no Likes service."); return; }
             if (includeShares && !sharesServiceId) { setCreateError("Bundle has no Shares service."); return; }
             if (includeSaves && !savesServiceId) { setCreateError("Bundle has no Saves service."); return; }
+            if (includeReposts && !repostsServiceId) { setCreateError("Bundle has no Reposts service."); return; }
             const commentsServiceId = selBundle.serviceIds.comments?.trim();
             if (includeComments && !commentsServiceId) { setCreateError("Bundle has no Comments service."); return; }
 
@@ -686,11 +697,13 @@ export function NewOrderPage({ apis, bundles, orders, prefillOrder, onCreateOrde
             const totalLikes = (safePlan?.runs || []).reduce((acc, run) => acc + run.likes, 0);
             const totalShares = (safePlan?.runs || []).reduce((acc, run) => acc + run.shares, 0);
             const totalSaves = (safePlan?.runs || []).reduce((acc, run) => acc + run.saves, 0);
+            const totalReposts = (safePlan?.runs || []).reduce((acc, run) => acc + (run.reposts || 0), 0);
             const totalCommentsQty = (safePlan?.runs || []).reduce((acc, run) => acc + (run.comments || 0), 0);
 
             if (includeLikes && totalLikes < 10) { setCreateError("Likes must be at least 10."); return; }
             if (includeShares && totalShares < 20) { setCreateError("Shares must be at least 20."); return; }
             if (includeSaves && totalSaves < 10) { setCreateError("Saves must be at least 10."); return; }
+            if (includeReposts && totalReposts < 10) { setCreateError("Reposts must be at least 10."); return; }
             if (includeComments && totalCommentsQty <= 0) { setCreateError("Comments must be greater than 0."); return; }
             if (quantity > 100000) { const proceed = window.confirm("Large mission. Continue?"); if (!proceed) return; }
 
@@ -705,6 +718,7 @@ export function NewOrderPage({ apis, bundles, orders, prefillOrder, onCreateOrde
             const likesRuns = (safePlan?.runs || []).map((run) => ({ time: run.at.toISOString(), quantity: Math.max(0, Math.floor(run.likes)) }));
             const sharesRuns = (safePlan?.runs || []).map((run) => ({ time: run.at.toISOString(), quantity: Math.max(0, Math.floor(run.shares)) }));
             const savesRuns = (safePlan?.runs || []).map((run) => ({ time: run.at.toISOString(), quantity: Math.max(0, Math.floor(run.saves)) }));
+            const repostsRuns = (safePlan?.runs || []).map((run) => ({ time: run.at.toISOString(), quantity: Math.max(0, Math.floor(run.reposts || 0)) }));
 
             const commentList = customComments.split("\n").map(c => c.trim()).filter(Boolean);
             const commentsRuns = (safePlan?.runs || []).map((run) => {
@@ -723,12 +737,14 @@ export function NewOrderPage({ apis, bundles, orders, prefillOrder, onCreateOrde
               likes?: { serviceId: string; runs: Array<{ time: string; quantity: number }> };
               shares?: { serviceId: string; runs: Array<{ time: string; quantity: number }> };
               saves?: { serviceId: string; runs: Array<{ time: string; quantity: number }> };
+              reposts?: { serviceId: string; runs: Array<{ time: string; quantity: number }> };
               comments?: { serviceId: string; runs: Array<{ time: string; comments: string }> };
             } = { views: { serviceId: viewsServiceId, runs: viewRuns } };
 
             if (includeLikes) servicesPayload.likes = { serviceId: likesServiceId, runs: likesRuns };
             if (includeShares) servicesPayload.shares = { serviceId: sharesServiceId, runs: sharesRuns };
             if (includeSaves) servicesPayload.saves = { serviceId: savesServiceId, runs: savesRuns };
+            if (includeReposts) servicesPayload.reposts = { serviceId: repostsServiceId!, runs: repostsRuns };
             if (includeComments && filteredCommentsRuns.length > 0) {
               servicesPayload.comments = { serviceId: commentsServiceId!, runs: filteredCommentsRuns };
             }
@@ -783,7 +799,7 @@ export function NewOrderPage({ apis, bundles, orders, prefillOrder, onCreateOrde
                     patternType: safePlan.patternType,
                     patternName: safePlan.patternName,
                     runs: safePlan?.runs || [],
-                    engagement: { likes: totalLikes, shares: totalShares, saves: totalSaves, comments: totalCommentsQty },
+                    engagement: { likes: totalLikes, shares: totalShares, saves: totalSaves, comments: totalCommentsQty, reposts: totalReposts },
                     serviceId: viewsServiceId,
                     selectedAPI: selApi.name,
                     selectedBundle: selBundle.name,
@@ -812,7 +828,7 @@ export function NewOrderPage({ apis, bundles, orders, prefillOrder, onCreateOrde
                     patternType: safePlan.patternType,
                     patternName: safePlan.patternName,
                     runs: safePlan?.runs || [],
-                    engagement: { likes: totalLikes, shares: totalShares, saves: totalSaves, comments: totalCommentsQty },
+                    engagement: { likes: totalLikes, shares: totalShares, saves: totalSaves, comments: totalCommentsQty, reposts: totalReposts },
                     serviceId: viewsServiceId,
                     selectedAPI: selApi.name,
                     selectedBundle: selBundle.name,
