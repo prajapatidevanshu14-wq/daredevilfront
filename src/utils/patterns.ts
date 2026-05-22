@@ -1336,7 +1336,7 @@ export function createPatternPlan(config: OrderConfig): PatternPlan {
   });
 
   const totalViews = provisionalRuns.reduce((acc, run) => acc + run.views, 0);
-  const likesRatio = random(0.05, 0.07);
+  const likesRatio = random(0.02, 0.03);
   const sharesRatio = random(0.01, 0.02);
   const savesRatio = random(0.005, 0.01);
   const commentsRatio = random(0.0002, 0.0003); // 0.02%–0.03%
@@ -1377,6 +1377,9 @@ if (config.includeComments) {
   : viewRuns.map(() => 0);
 
   const likesRuns = likesBase;
+  const repostsBase = config.includeReposts
+    ? likesRuns.map((likes) => Math.max(0, Math.floor(likes / 3)))
+    : viewRuns.map(() => 0);
   const sharesRuns = normalizeSharesRuns(sharesBase, 20);
   const savesRuns = clearFirstRun(
   savesBase.map(v => {
@@ -1388,6 +1391,9 @@ if (config.includeComments) {
     return v + variation;
   })
 );
+  const repostsRuns = config.includeReposts
+  ? normalizeSharesRuns(repostsBase, 10)
+  : viewRuns.map(() => 0);
   const commentsRuns = (() => {
   const result = Array.from({ length: commentsBase.length }, () => 0);
 
@@ -1428,6 +1434,7 @@ if (config.includeComments) {
   let cumulativeShares = 0;
   let cumulativeSaves = 0;
   let cumulativeComments = 0;
+  let cumulativeReposts = 0;
 
   const runs: RunStep[] = provisionalRuns.map((run, index) => {
     cumulativeViews += run.views;
@@ -1435,6 +1442,7 @@ if (config.includeComments) {
     cumulativeShares += sharesRuns[index];
     cumulativeSaves += savesRuns[index];
     cumulativeComments += commentsRuns[index];
+    cumulativeReposts += repostsRuns[index];
 
     return {
       run: index + 1,
@@ -1445,11 +1453,13 @@ if (config.includeComments) {
       shares: sharesRuns[index],
       saves: savesRuns[index],
       comments: commentsRuns[index],
+      reposts: repostsRuns[index],
       cumulativeViews,
       cumulativeLikes,
       cumulativeShares,
       cumulativeSaves,
       cumulativeComments,
+      cumulativeReposts,
     };
   });
 
