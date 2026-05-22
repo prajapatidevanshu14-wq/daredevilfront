@@ -80,7 +80,7 @@ function getRealStatus(order: CreatedOrder): string {
 function getDeliveredStats(order: CreatedOrder) {
   const runs = order.runs || [];
   const runStatuses = order.runStatuses || [];
-  let views = 0, likes = 0, shares = 0, saves = 0, comments = 0;
+  let views = 0, likes = 0, shares = 0, saves = 0, comments = 0, reposts = 0;
   runs.forEach((run, index) => {
     const status = runStatuses[index];
     if (status === "completed") {
@@ -89,9 +89,10 @@ function getDeliveredStats(order: CreatedOrder) {
       shares += run.shares || 0;
       saves += run.saves || 0;
       comments += run.comments || 0;
+      reposts += run.reposts || 0;
     }
   });
-  return { views, likes, shares, saves, comments };
+  return { views, likes, shares, saves, comments, reposts };
 }
 
 function BackendRunTable({ runs }: { runs: BackendRunInfo[] }) {
@@ -100,6 +101,7 @@ function BackendRunTable({ runs }: { runs: BackendRunInfo[] }) {
     LIKES: "text-pink-400",
     SHARES: "text-blue-400",
     SAVES: "text-purple-400",
+    REPOSTS: "text-cyan-400",
     COMMENTS: "text-green-400",
   };
 
@@ -604,12 +606,13 @@ export function OrdersPage({
         </div>
 
         {/* Stats */}
-        <div className="mt-3 ml-8 grid grid-cols-5 gap-1 sm:gap-2">
+        <div className="mt-3 ml-8 grid grid-cols-3 gap-1 sm:grid-cols-6 sm:gap-2">
           {[
             { value: `${(order.totalViews / 1000).toFixed(0)}k`, label: "Views", color: "text-yellow-400" },
             { value: order.engagement.likes, label: "Likes", color: "text-pink-400" },
             { value: order.engagement.shares, label: "Shares", color: "text-blue-400" },
             { value: order.engagement.saves, label: "Saves", color: "text-purple-400" },
+            { value: order.engagement.reposts || 0, label: "Reposts", color: "text-cyan-400" },
             { value: order.engagement.comments || 0, label: "Cmts", color: "text-green-400" },
           ].map((stat) => (
             <div key={stat.label} className="rounded-md bg-black/50 px-1 py-1 text-center sm:px-2">
@@ -627,7 +630,8 @@ export function OrdersPage({
             delivered.likes > 0 ||
             delivered.shares > 0 ||
             delivered.saves > 0 ||
-            delivered.comments > 0;
+            delivered.comments > 0 ||
+            delivered.reposts > 0;
           const isActive = status === "running" || status === "paused";
           if (!hasDelivered || !isActive) return null;
           return (
@@ -647,6 +651,9 @@ export function OrdersPage({
                 )}
                 {delivered.saves > 0 && (
                   <span className="text-[10px] text-emerald-400">💾 {delivered.saves.toLocaleString()} saves</span>
+                )}
+                {delivered.reposts > 0 && (
+                  <span className="text-[10px] text-emerald-400">🔁 {delivered.reposts.toLocaleString()} reposts</span>
                 )}
                 {delivered.comments > 0 && (
                   <span className="text-[10px] text-emerald-400">💬 {delivered.comments.toLocaleString()} comments</span>
@@ -749,6 +756,7 @@ export function OrdersPage({
                           <th className="pb-2 pr-3">Likes</th>
                           <th className="pb-2 pr-3">Shares</th>
                           <th className="pb-2 pr-3">Saves</th>
+                          <th className="pb-2 pr-3">Reposts</th>
                           <th className="pb-2">Status</th>
                         </tr>
                       </thead>
@@ -768,6 +776,7 @@ export function OrdersPage({
                               <td className="py-1.5 pr-3 text-pink-400">{run.likes || 0}</td>
                               <td className="py-1.5 pr-3 text-blue-400">{run.shares || 0}</td>
                               <td className="py-1.5 pr-3 text-purple-400">{run.saves || 0}</td>
+                              <td className="py-1.5 pr-3 text-cyan-400">{run.reposts || 0}</td>
                               <td className="py-1.5">
                                 {runStatus === "completed" ? (
                                   <span className="text-emerald-400">✅</span>
@@ -834,6 +843,7 @@ export function OrdersPage({
         likes: (run.cumulativeLikes || run.likes || 0) * 10,
         shares: (run.cumulativeShares || run.shares || 0) * 10,
         saves: (run.cumulativeSaves || run.saves || 0) * 10,
+        reposts: (run.cumulativeReposts || run.reposts || 0) * 10,
         comments: (run.cumulativeComments || run.comments || 0) * 10,
       }));
     }, [group.orders]);
@@ -966,6 +976,7 @@ export function OrdersPage({
                       <Line type="monotone" dataKey="likes" stroke="#ec4899" strokeWidth={1.5} dot={false} name="Likes" />
                       <Line type="monotone" dataKey="shares" stroke="#22c55e" strokeWidth={1.5} dot={false} name="Shares" />
                       <Line type="monotone" dataKey="saves" stroke="#eab308" strokeWidth={1.5} dot={false} name="Saves" />
+                      <Line type="monotone" dataKey="reposts" stroke="#06b6d4" strokeWidth={1.5} dot={false} name="Reposts" />
                       <Line type="monotone" dataKey="comments" stroke="#a855f7" strokeWidth={1.5} dot={false} name="Comments" />
                     </LineChart>
                   </ResponsiveContainer>
@@ -1067,6 +1078,7 @@ export function OrdersPage({
         likes: (run.cumulativeLikes || run.likes || 0) * 10,
         shares: (run.cumulativeShares || run.shares || 0) * 10,
         saves: (run.cumulativeSaves || run.saves || 0) * 10,
+        reposts: (run.cumulativeReposts || run.reposts || 0) * 10,
         comments: (run.cumulativeComments || run.comments || 0) * 10,
       }));
     }, [order]);
@@ -1121,11 +1133,12 @@ export function OrdersPage({
             </div>
 
             {/* Engagement */}
-            <div className="mt-2 grid grid-cols-4 gap-2">
+            <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-6">
               {[
                 { value: order.engagement.likes, label: "Likes", color: "text-pink-400" },
                 { value: order.engagement.shares, label: "Shares", color: "text-blue-400" },
                 { value: order.engagement.saves, label: "Saves", color: "text-purple-400" },
+                { value: order.engagement.reposts || 0, label: "Reposts", color: "text-cyan-400" },
                 { value: order.engagement.comments || 0, label: "Cmts", color: "text-green-400" },
               ].map((stat) => (
                 <div key={stat.label} className="rounded-md bg-black/50 px-2 py-1 text-center">
@@ -1155,7 +1168,7 @@ export function OrdersPage({
               return (
                 <div className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
                   <h4 className="text-xs font-semibold text-emerald-400 mb-2">✅ Delivered So Far</h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
                     {delivered.views > 0 && (
                       <div className="rounded-lg bg-black/50 px-2 py-1.5 text-center">
                         <p className="text-xs font-bold text-emerald-400">{delivered.views.toLocaleString()}</p>
@@ -1178,6 +1191,12 @@ export function OrdersPage({
                       <div className="rounded-lg bg-black/50 px-2 py-1.5 text-center">
                         <p className="text-xs font-bold text-emerald-400">{delivered.saves.toLocaleString()}</p>
                         <p className="text-[9px] text-gray-500">💾 Saves</p>
+                      </div>
+                    )}
+                    {delivered.reposts > 0 && (
+                      <div className="rounded-lg bg-black/50 px-2 py-1.5 text-center">
+                        <p className="text-xs font-bold text-emerald-400">{delivered.reposts.toLocaleString()}</p>
+                        <p className="text-[9px] text-gray-500">🔁 Reposts</p>
                       </div>
                     )}
                     {delivered.comments > 0 && (
