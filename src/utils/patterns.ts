@@ -1346,13 +1346,14 @@ if (config.includeComments) {
   }
 }
 
+  // any active engagement run should be >= 10; zero is allowed for skipped runs
   const likesBase = config.includeLikes ? distributeByViewsProportional(provisionalRuns, likesTotal, 10, 18) : viewRuns.map(() => 0);
   const sharesBase = config.includeShares
-  ? distributeByViewsProportional(provisionalRuns, sharesTotal, 5, 12)
+  ? distributeByViewsProportional(provisionalRuns, sharesTotal, 10, 14)
   : viewRuns.map(() => 0);
 
   const savesBase = config.includeSaves
-  ? distributeByViewsProportional(provisionalRuns, savesTotal, 3, 8)
+  ? distributeByViewsProportional(provisionalRuns, savesTotal, 10, 12)
   : viewRuns.map(() => 0);
   const commentsBase = config.includeComments
   ? distributeByViewsProportional(provisionalRuns, commentsTotal, 1)
