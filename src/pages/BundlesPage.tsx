@@ -12,6 +12,7 @@ interface BundlesPageProps {
     shares: string;
     saves: string;
     comments: string;
+    reposts: string;
   }) => void;
   onUpdateBundle: (
     id: string,
@@ -23,6 +24,7 @@ interface BundlesPageProps {
       shares: string;
       saves: string;
       comments: string;
+      reposts: string;
     }
   ) => void;
   onDeleteBundle: (id: string) => void;
