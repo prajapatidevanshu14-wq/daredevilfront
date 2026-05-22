@@ -89,6 +89,7 @@ export function DashboardPage({ orders }: DashboardPageProps) {
     let likes = 0;
     let shares = 0;
     let saves = 0;
+    let reposts = 0;
 
     filteredOrders.forEach((order) => {
       (order.runs || []).forEach((run) => {
@@ -96,15 +97,17 @@ export function DashboardPage({ orders }: DashboardPageProps) {
         likes += run.likes || 0;
         shares += run.shares || 0;
         saves += run.saves || 0;
+        reposts += run.reposts || 0;
       });
     });
 
-    const total = views + likes + shares + saves;
+    const total = views + likes + shares + saves + reposts;
     return {
       views: { count: views, percent: total > 0 ? Math.round((views / total) * 100) : 0 },
       likes: { count: likes, percent: total > 0 ? Math.round((likes / total) * 100) : 0 },
       shares: { count: shares, percent: total > 0 ? Math.round((shares / total) * 100) : 0 },
       saves: { count: saves, percent: total > 0 ? Math.round((saves / total) * 100) : 0 },
+      reposts: { count: reposts, percent: total > 0 ? Math.round((reposts / total) * 100) : 0 },
       total,
     };
   }, [filteredOrders]);
@@ -372,6 +375,7 @@ export function DashboardPage({ orders }: DashboardPageProps) {
               { label: "❤️ Likes", data: servicesBreakdown.likes, color: "bg-yellow-600" },
               { label: "🔄 Shares", data: servicesBreakdown.shares, color: "bg-yellow-700" },
               { label: "🔖 Saves", data: servicesBreakdown.saves, color: "bg-amber-600" },
+              { label: "🔁 Reposts", data: servicesBreakdown.reposts, color: "bg-cyan-600" },
             ].map((item) => (
               <div key={item.label}>
                 <div className="flex items-center justify-between text-xs">
