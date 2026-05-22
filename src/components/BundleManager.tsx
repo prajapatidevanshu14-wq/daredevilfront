@@ -13,6 +13,7 @@ interface BundleManagerProps {
     shares: string;
     saves: string;
     comments: string;
+    reposts: string;
   }) => void;
   onUpdateBundle: (
     id: string,
@@ -24,6 +25,7 @@ interface BundleManagerProps {
       shares: string;
       saves: string;
       comments: string;
+      reposts: string;
     }
   ) => void;
   onDeleteBundle: (id: string) => void;
@@ -148,6 +150,7 @@ export function BundleManager({ apis, bundles, onAddBundle, onUpdateBundle, onDe
   const [shares, setShares] = useState("");
   const [saves, setSaves] = useState("");
   const [comments, setComments] = useState("");
+  const [reposts, setReposts] = useState("");
 
   const viewOptions = useMemo(
     () => filterServices(getApiServices(apis, apiId), ["view", "views"]),
@@ -169,6 +172,10 @@ export function BundleManager({ apis, bundles, onAddBundle, onUpdateBundle, onDe
     () => filterServices(getApiServices(apis, apiId), ["comment", "comments"]),
     [apis, apiId]
   );
+  const repostOptions = useMemo(
+    () => filterServices(getApiServices(apis, apiId), ["repost", "reposts", "reshare"]),
+    [apis, apiId]
+  );
 
   const resetForm = () => {
     setName("");
@@ -178,6 +185,7 @@ export function BundleManager({ apis, bundles, onAddBundle, onUpdateBundle, onDe
     setShares("");
     setSaves("");
     setComments("");
+    setReposts("");
     setEditingBundleId(null);
     setShowForm(false);
   };
@@ -212,7 +220,7 @@ export function BundleManager({ apis, bundles, onAddBundle, onUpdateBundle, onDe
             event.preventDefault();
             if (!name.trim()) return;
             if (!apiId) return;
-            if (!views.trim() || !likes.trim() || !shares.trim() || !saves.trim() || !comments.trim()) return;
+            if (!views.trim() || !likes.trim() || !shares.trim() || !saves.trim()) return;
             const payload = {
               name: name.trim(),
               apiId,
@@ -221,6 +229,7 @@ export function BundleManager({ apis, bundles, onAddBundle, onUpdateBundle, onDe
               shares: shares.trim(),
               saves: saves.trim(),
               comments: comments.trim(),
+              reposts: reposts.trim(),
             };
             if (editingBundleId) {
               onUpdateBundle(editingBundleId, payload);
@@ -258,6 +267,7 @@ export function BundleManager({ apis, bundles, onAddBundle, onUpdateBundle, onDe
                 setShares("");
                 setSaves("");
                 setComments("");
+                setReposts("");
               }}
               className="w-full rounded-xl border border-yellow-500/30 bg-black px-3 py-2.5 text-xs sm:text-sm text-gray-100"
             >
@@ -313,6 +323,13 @@ export function BundleManager({ apis, bundles, onAddBundle, onUpdateBundle, onDe
                   onChange={setComments}
                   placeholder="Select Comments Service"
                   label="💬 Comments Service"
+                />
+                <SearchableSelect
+                  options={repostOptions}
+                  value={reposts}
+                  onChange={setReposts}
+                  placeholder="Select Reposts Service"
+                  label="🔁 Reposts Service"
                 />
               </div>
             </>
@@ -381,6 +398,7 @@ export function BundleManager({ apis, bundles, onAddBundle, onUpdateBundle, onDe
                     setShares(bundle.serviceIds.shares);
                     setSaves(bundle.serviceIds.saves);
                     setComments(bundle.serviceIds.comments || "");
+                    setReposts(bundle.serviceIds.reposts || "");
                     setShowForm(true);
                   }}
                   className="rounded-md border border-yellow-500/30 bg-yellow-500/10 px-2.5 py-1.5 text-xs text-yellow-300 transition hover:bg-yellow-500/20"
@@ -410,6 +428,7 @@ export function BundleManager({ apis, bundles, onAddBundle, onUpdateBundle, onDe
                 { label: "🔄 Shares", value: bundle.serviceIds.shares },
                 { label: "💾 Saves", value: bundle.serviceIds.saves },
                 { label: "💬 Comments", value: bundle.serviceIds.comments },
+                { label: "🔁 Reposts", value: bundle.serviceIds.reposts },
               ].map((item) => (
                 <div
                   key={item.label}
