@@ -31,6 +31,8 @@ export type QuickPatternPreset =
   | "trending-push"
   | "slow-burn";
 
+export type RelativeCountMode = "auto" | "custom";
+
 // ============ CONFIG TYPES ============
 export interface DeliveryOption {
   mode: "auto" | "preset" | "custom";
@@ -62,9 +64,6 @@ export interface OrderConfig {
 }
 
 // ============ RUN TYPES ============
-// RunStep = used by original site
-// PatternRun = alias used by copied site
-// They are identical - we keep both names
 export interface RunStep {
   run: number;
   at: Date;
@@ -83,7 +82,6 @@ export interface RunStep {
   cumulativeReposts: number;
 }
 
-// Alias so both sites work
 export type PatternRun = RunStep;
 
 // ============ PATTERN PLAN ============
@@ -143,7 +141,6 @@ export interface Bundle {
 }
 
 // ============ BACKEND RUN INFO ============
-// Full version from original site with all retry fields
 export interface BackendRunInfo {
   id: string | number;
   label: string;
@@ -177,7 +174,7 @@ export interface CreatedOrder {
   patternType: PatternType;
   patternName: string;
   runs: RunStep[];
-    engagement: {
+  engagement: {
     likes: number;
     shares: number;
     saves: number;
