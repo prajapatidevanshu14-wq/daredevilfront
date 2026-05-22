@@ -1133,14 +1133,14 @@ function distributeByViewsProportional(
   const result = Array.from({ length: runs.length }, () => 0);
   const maxViews = Math.max(1, ...runs.map((r) => r.views || 0));
   const maxActiveAllowed = Math.max(1, Math.min(runs.length, Math.floor(targetTotal / Math.max(1, minPerRun))));
-  const densityCap = Math.max(1, Math.min(maxActiveAllowed, Math.round(runs.length * 0.78)));
+  const densityCap = Math.max(1, Math.min(maxActiveAllowed, Math.round(runs.length * 0.45)));
 
   const targetActive = clamp(
     Math.round(targetTotal / Math.max(minPerRun + 1, preferredAvgPerActive)),
     1,
     densityCap
   );
-  const activeJitter = Math.max(1, Math.round(targetActive * 0.15));
+  const activeJitter = Math.max(1, Math.round(targetActive * 0.1));
   const activeCount = clamp(targetActive + randomInt(-activeJitter, activeJitter), 1, densityCap);
 
   const weights = runs.map((run, i) => {
@@ -1188,6 +1188,38 @@ function distributeByViewsProportional(
   });
 
   return result;
+}
+
+function spreadDistributionToEligibleRuns(
+  runs: { views: number }[],
+  eligibleIndexes: number[],
+  targetTotal: number,
+  minPerRun = 10,
+  preferredAvgPerActive = Math.max(minPerRun + 4, minPerRun * 2)
+): number[] {
+  const result = Array.from({ length: runs.length }, () => 0);
+  if (targetTotal <= 0 || eligibleIndexes.length === 0) return result;
+
+  const subsetRuns = eligibleIndexes.map((index) => runs[index]);
+  const distributed = distributeByViewsProportional(
+    subsetRuns,
+    targetTotal,
+    minPerRun,
+    preferredAvgPerActive
+  );
+
+  eligibleIndexes.forEach((runIndex, index) => {
+    result[runIndex] = distributed[index] || 0;
+  });
+
+  return result;
+}
+
+function getActiveIndexes(values: number[]): number[] {
+  return values
+    .map((value, index) => ({ value, index }))
+    .filter((item) => item.value > 0)
+    .map((item) => item.index);
 }
 
 function normalizeSharesRuns(values: number[], minimum: number): number[] {
@@ -1347,30 +1379,40 @@ if (config.includeComments) {
 }
 
   // any active engagement run should be >= 10; zero is allowed for skipped runs
-  const likesBase = config.includeLikes ? distributeByViewsProportional(provisionalRuns, likesTotal, 10, 18) : viewRuns.map(() => 0);
-  const sharesBase = config.includeShares
-  ? distributeByViewsProportional(provisionalRuns, sharesTotal, 10, 14)
-  : viewRuns.map(() => 0);
+  const likesRuns = config.includeLikes
+    ? distributeByViewsProportional(provisionalRuns, likesTotal, 10, 28)
+    : viewRuns.map(() => 0);
 
-  const savesBase = config.includeSaves
-  ? distributeByViewsProportional(provisionalRuns, savesTotal, 10, 12)
-  : viewRuns.map(() => 0);
+  const likeActiveIndexes = getActiveIndexes(likesRuns);
+  const firstLikeIndex = likeActiveIndexes[0] ?? 0;
+  const laterLikeIndexes = likeActiveIndexes.filter((index) => index > firstLikeIndex);
+  const fallbackEligibleIndexes = provisionalRuns.map((_, index) => index).filter((index) => index > 0);
+  const shareEligibleIndexes = likeActiveIndexes.length > 0
+    ? (laterLikeIndexes.length > 0 ? laterLikeIndexes : likeActiveIndexes.slice(-1))
+    : fallbackEligibleIndexes;
+  const saveEligibleIndexes = likeActiveIndexes.length > 0
+    ? (laterLikeIndexes.length > 0 ? laterLikeIndexes.filter((_, index) => index % 2 === 0) : likeActiveIndexes.slice(-1))
+    : fallbackEligibleIndexes.filter((_, index) => index % 2 === 0);
+  const repostEligibleIndexes = likeActiveIndexes.length > 0
+    ? (laterLikeIndexes.length > 0 ? laterLikeIndexes.filter((_, index) => index % 2 === 1 || laterLikeIndexes.length <= 3) : likeActiveIndexes.slice(-1))
+    : fallbackEligibleIndexes.filter((_, index) => index % 2 === 1 || fallbackEligibleIndexes.length <= 3);
+
+  const sharesRuns = config.includeShares
+    ? spreadDistributionToEligibleRuns(provisionalRuns, shareEligibleIndexes, sharesTotal, 10, 16)
+    : viewRuns.map(() => 0);
+
+  const savesRuns = config.includeSaves
+    ? spreadDistributionToEligibleRuns(provisionalRuns, saveEligibleIndexes, savesTotal, 10, 14)
+    : viewRuns.map(() => 0);
+
   const commentsBase = config.includeComments
   ? distributeByViewsProportional(provisionalRuns, commentsTotal, 1)
   : viewRuns.map(() => 0);
 
-  const likesRuns = likesBase;
   const repostsTarget = config.includeReposts ? Math.max(10, Math.floor(likesTotal / 3)) : 0;
-  const repostsBase = config.includeReposts
-    ? distributeByViewsProportional(provisionalRuns, repostsTarget, 10, 14)
+  const repostsRuns = config.includeReposts
+    ? spreadDistributionToEligibleRuns(provisionalRuns, repostEligibleIndexes, repostsTarget, 10, 14)
     : viewRuns.map(() => 0);
-  const sharesRuns = sharesBase;
-  const savesRuns = savesBase.map(v => {
-    if (v <= 0) return 0;
-    const variation = Math.floor(v * (Math.random() * 0.25));
-    return Math.max(0, v + variation);
-  });
-  const repostsRuns = repostsBase;
   const commentsRuns = (() => {
   const result = Array.from({ length: commentsBase.length }, () => 0);
 
