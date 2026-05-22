@@ -165,6 +165,7 @@ export function RunTable({
               <th className="px-3 py-2">Shares</th>
               <th className="px-3 py-2">Saves</th>
               <th className="px-3 py-2">Comments</th>
+              <th className="px-3 py-2">Reposts</th>
             </tr>
           </thead>
           <tbody>
@@ -187,6 +188,9 @@ export function RunTable({
                 <td className="px-3 py-2 text-purple-400">{run.saves || 0}</td>
                 <td className="px-3 py-2 text-green-400">
                   {run.comments || 0}
+                </td>
+                <td className="px-3 py-2 text-cyan-400">
+                  {run.reposts || 0}
                 </td>
               </tr>
             ))}
@@ -240,6 +244,7 @@ export function RunTable({
               <th className="px-3 py-2 w-16">Shares</th>
               <th className="px-3 py-2 w-14">Saves</th>
               <th className="px-3 py-2 w-14">Cmts</th>
+              <th className="px-3 py-2 w-16">Reposts</th>
               <th className="px-3 py-2 w-24">Status</th>
               <th className="px-3 py-2 w-32">Placed At</th>
               <th className="px-3 py-2">Info</th>
@@ -303,6 +308,9 @@ export function RunTable({
                   </td>
                   <td className="px-3 py-2 text-green-400">
                     {run.comments || 0}
+                  </td>
+                  <td className="px-3 py-2 text-cyan-400">
+                    {run.reposts || 0}
                   </td>
 
                   {/* Status Badge */}
