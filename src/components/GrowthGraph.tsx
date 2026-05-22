@@ -31,6 +31,7 @@ interface FavouriteConfig {
   includeShares: boolean;
   includeSaves: boolean;
   includeComments: boolean;
+  includeReposts: boolean;
   peakHoursBoost: boolean;
   // 🔥 Save actual runs as proportions (0-1) of total views
   runProportions: Array<{
@@ -40,6 +41,7 @@ interface FavouriteConfig {
     sharesFraction: number;
     savesFraction: number;
     commentsFraction: number;
+    repostsFraction: number;
   }>;
   savedTotalViews: number;
 }
@@ -53,6 +55,7 @@ interface GrowthGraphProps {
   includeShares?: boolean;
   includeSaves?: boolean;
   includeComments?: boolean;
+  includeReposts?: boolean;
   peakHoursBoost?: boolean;
   onApplyPreset?: (preset: QuickPatternPreset) => void;
   onGenerate?: () => void;
@@ -101,10 +104,11 @@ function buildSmoothGraphData(plan: PatternPlan) {
     likes: number;
     shares: number;
     saves: number;
+    reposts: number;
     comments: number;
   }> = [];
 
-  rows.push({ label: "0m", views: 0, likes: 0, shares: 0, saves: 0, comments: 0 });
+  rows.push({ label: "0m", views: 0, likes: 0, shares: 0, saves: 0, reposts: 0, comments: 0 });
 
   for (let index = 0; index < safeRuns.length; index += 1) {
     const current = safeRuns[index];
@@ -116,6 +120,7 @@ function buildSmoothGraphData(plan: PatternPlan) {
             cumulativeLikes: 0,
             cumulativeShares: 0,
             cumulativeSaves: 0,
+            cumulativeReposts: 0,
             cumulativeComments: 0,
           }
         : safeRuns[index - 1];
@@ -153,6 +158,7 @@ function buildSmoothGraphData(plan: PatternPlan) {
       likes: pointValue(previous.cumulativeLikes, current.cumulativeLikes, 0.38, wave * 0.8, false),
       shares: pointValue(previous.cumulativeShares, current.cumulativeShares, 0.38, wave * 0.75, false),
       saves: pointValue(previous.cumulativeSaves, current.cumulativeSaves, 0.38, wave * 0.85, false),
+      reposts: pointValue(previous.cumulativeReposts, current.cumulativeReposts, 0.38, wave * 0.82, false),
       comments: pointValue(previous.cumulativeComments, current.cumulativeComments, 0.38, wave * 0.9, false),
     });
 
@@ -162,6 +168,7 @@ function buildSmoothGraphData(plan: PatternPlan) {
       likes: pointValue(previous.cumulativeLikes, current.cumulativeLikes, 0.76, wave * -0.62, false),
       shares: pointValue(previous.cumulativeShares, current.cumulativeShares, 0.76, wave * -0.58, false),
       saves: pointValue(previous.cumulativeSaves, current.cumulativeSaves, 0.76, wave * -0.64, false),
+      reposts: pointValue(previous.cumulativeReposts, current.cumulativeReposts, 0.76, wave * -0.61, false),
       comments: pointValue(previous.cumulativeComments, current.cumulativeComments, 0.76, wave * -0.7, false),
     });
 
@@ -171,6 +178,7 @@ function buildSmoothGraphData(plan: PatternPlan) {
       likes: current.cumulativeLikes,
       shares: current.cumulativeShares,
       saves: current.cumulativeSaves,
+      reposts: current.cumulativeReposts,
       comments: current.cumulativeComments,
     });
   }
@@ -186,6 +194,7 @@ function buildSteppedGraphData(plan: PatternPlan) {
     likes: (run.cumulativeLikes || 0) * 10,
     shares: (run.cumulativeShares || 0) * 10,
     saves: (run.cumulativeSaves || 0) * 10,
+    reposts: (run.cumulativeReposts || 0) * 10,
     comments: (run.cumulativeComments || 0) * 10,
   }));
 }
@@ -229,6 +238,7 @@ export function GrowthGraph({
   includeShares = false,
   includeSaves = false,
   includeComments = false,
+  includeReposts = false,
   peakHoursBoost = false,
   onApplyPreset,
   onGenerate,
@@ -258,6 +268,7 @@ export function GrowthGraph({
     const savedTotalShares = safePlan.runs.reduce((sum, r) => sum + (r.shares || 0), 0);
     const savedTotalSaves = safePlan.runs.reduce((sum, r) => sum + (r.saves || 0), 0);
     const savedTotalComments = safePlan.runs.reduce((sum, r) => sum + (r.comments || 0), 0);
+    const savedTotalReposts = safePlan.runs.reduce((sum, r) => sum + (r.reposts || 0), 0);
 
     // 🔥 Store each run as a fraction of total (so it scales to any view count)
     const runProportions = safePlan.runs.map((r) => ({
@@ -267,6 +278,7 @@ export function GrowthGraph({
       sharesFraction: savedTotalShares > 0 ? (r.shares || 0) / savedTotalShares : 0,
       savesFraction: savedTotalSaves > 0 ? (r.saves || 0) / savedTotalSaves : 0,
       commentsFraction: savedTotalComments > 0 ? (r.comments || 0) / savedTotalComments : 0,
+      repostsFraction: savedTotalReposts > 0 ? (r.reposts || 0) / savedTotalReposts : 0,
     }));
 
     const newFav: FavouriteConfig = {
@@ -287,6 +299,7 @@ export function GrowthGraph({
       includeShares,
       includeSaves,
       includeComments,
+      includeReposts,
       peakHoursBoost,
       runProportions,
       savedTotalViews,
@@ -474,6 +487,7 @@ export function GrowthGraph({
                       {fav.includeShares && <span title="Shares">🔄</span>}
                       {fav.includeSaves && <span title="Saves">💾</span>}
                       {fav.includeComments && <span title="Comments">💬</span>}
+                      {fav.includeReposts && <span title="Reposts">🔁</span>}
                       {fav.peakHoursBoost && <span title="Peak Hours">🔥</span>}
                     </span>
                     <span className="text-[9px] text-gray-700">
@@ -541,6 +555,7 @@ export function GrowthGraph({
               <Line type={curveType} dataKey="likes" name="Likes" stroke="#a78bfa" strokeWidth={1.8} dot={false} isAnimationActive animationDuration={900} />
               <Line type={curveType} dataKey="shares" name="Shares" stroke="#f59e0b" strokeWidth={1.8} dot={false} isAnimationActive animationDuration={900} />
               <Line type={curveType} dataKey="saves" name="Saves" stroke="#34d399" strokeWidth={1.8} dot={false} isAnimationActive animationDuration={900} />
+              <Line type={curveType} dataKey="reposts" name="Reposts" stroke="#06b6d4" strokeWidth={1.8} dot={false} isAnimationActive animationDuration={900} />
               <Line type={curveType} dataKey="comments" name="Comments" stroke="#f472b6" strokeWidth={1.8} dot={false} isAnimationActive animationDuration={900} />
             </LineChart>
           </ResponsiveContainer>
@@ -556,11 +571,13 @@ export function GrowthGraph({
               <Line type="monotone" dataKey="likes" stroke="#ec4899" opacity={0.1} dot={false} strokeDasharray="5 5" name="planned-likes" legendType="none" tooltipType="none" />
               <Line type="monotone" dataKey="shares" stroke="#22c55e" opacity={0.1} dot={false} strokeDasharray="5 5" name="planned-shares" legendType="none" tooltipType="none" />
               <Line type="monotone" dataKey="saves" stroke="#eab308" opacity={0.1} dot={false} strokeDasharray="5 5" name="planned-saves" legendType="none" tooltipType="none" />
+              <Line type="monotone" dataKey="reposts" stroke="#06b6d4" opacity={0.1} dot={false} strokeDasharray="5 5" name="planned-reposts" legendType="none" tooltipType="none" />
               <Line type="monotone" dataKey="comments" stroke="#a855f7" opacity={0.1} dot={false} strokeDasharray="5 5" name="planned-comments" legendType="none" tooltipType="none" />
               <Line type="monotone" dataKey="views" stroke="#3b82f6" strokeWidth={2} dot={false} name="Views" isAnimationActive animationDuration={900} />
               <Line type="monotone" dataKey="likes" stroke="#ec4899" strokeWidth={2} dot={false} name="Likes" isAnimationActive animationDuration={900} />
               <Line type="monotone" dataKey="shares" stroke="#22c55e" strokeWidth={2} dot={false} name="Shares" isAnimationActive animationDuration={900} />
               <Line type="monotone" dataKey="saves" stroke="#eab308" strokeWidth={2} dot={false} name="Saves" isAnimationActive animationDuration={900} />
+              <Line type="monotone" dataKey="reposts" stroke="#06b6d4" strokeWidth={2} dot={false} name="Reposts" isAnimationActive animationDuration={900} />
               <Line type="monotone" dataKey="comments" stroke="#a855f7" strokeWidth={2} dot={false} name="Comments" isAnimationActive animationDuration={900} />
             </LineChart>
           </ResponsiveContainer>
