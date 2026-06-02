@@ -7,10 +7,12 @@ import type {
   Bundle,
   CreatedOrder,
   DeliveryOption,
+  EngagementRatios,
   OrderConfig,
   PatternPlan,
   QuickPatternPreset,
 } from "../types/order";
+import { DEFAULT_ENGAGEMENT_RATIOS } from "../types/order";
 import { createSmmOrder } from "../utils/api";
 import { createPatternPlan } from "../utils/patterns";
 
@@ -19,6 +21,7 @@ interface NewOrderPageProps {
   bundles: Bundle[];
   orders: CreatedOrder[];
   prefillOrder?: CreatedOrder | null;
+  activeRatios?: EngagementRatios;
   onCreateOrder: (order: CreatedOrder) => void;
   onNavigateToOrders: (notice?: string) => void;
 }
@@ -27,7 +30,13 @@ function createOrderId() {
   return `ORD-${Date.now().toString().slice(-6)}`;
 }
 
-export function NewOrderPage({ apis, bundles, orders, prefillOrder, onCreateOrder, onNavigateToOrders }: NewOrderPageProps) {
+export function NewOrderPage({ apis, bundles, orders, prefillOrder, activeRatios, onCreateOrder, onNavigateToOrders }: NewOrderPageProps) {
+  const effectiveRatios = activeRatios ?? DEFAULT_ENGAGEMENT_RATIOS;
+  const ratiosAreCustom =
+    !!activeRatios &&
+    (Object.keys(effectiveRatios) as (keyof EngagementRatios)[]).some(
+      (k) => effectiveRatios[k] !== DEFAULT_ENGAGEMENT_RATIOS[k]
+    );
   const prefillApiId = prefillOrder ? apis.find((api) => api.name === prefillOrder.selectedAPI)?.id ?? "" : "";
   const prefillBundleId = prefillOrder
     ? bundles.find((bundle) => bundle.name === prefillOrder.selectedBundle && bundle.apiId === prefillApiId)?.id ?? ""
@@ -138,11 +147,14 @@ export function NewOrderPage({ apis, bundles, orders, prefillOrder, onCreateOrde
             ? { ...delivery, hours: Math.max(6, Math.min(48, delivery.hours)) }
             : delivery,
       minViewsPerRun,
+      // 🔥 honor user-set ratios from the Ratios page
+      customRatios: ratiosAreCustom ? effectiveRatios : null,
     }),
     [
       postUrl, totalViews, startDelayHours, includeLikes, includeShares,
       includeSaves, includeComments, includeReposts, variancePercent, peakHoursBoost,
       quickPreset, delivery, customHours, minViewsPerRun,
+      effectiveRatios, ratiosAreCustom,
     ]
   );
 
@@ -263,6 +275,25 @@ export function NewOrderPage({ apis, bundles, orders, prefillOrder, onCreateOrde
           <span className="text-[10px] text-gray-500 ml-1 hidden sm:inline">Configure delivery patterns</span>
         </div>
       </motion.div>
+
+      {/* Active custom ratios banner */}
+      {ratiosAreCustom && (
+        <motion.div
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-[11px] text-yellow-200"
+        >
+          <span className="font-semibold">⚖️ Custom ratios active:</span>
+          <span>❤️ {effectiveRatios.likes}%</span>
+          <span>🔁 {effectiveRatios.shares}%</span>
+          <span>🔖 {effectiveRatios.saves}%</span>
+          <span>💬 {effectiveRatios.comments}%</span>
+          <span>📢 {effectiveRatios.reposts}%</span>
+          <span className="ml-auto text-[10px] text-yellow-400/70">
+            Change them in the Ratios page
+          </span>
+        </motion.div>
+      )}
 
       {/* Main Grid - Single col mobile, two col desktop */}
       <div className="grid gap-3 xl:grid-cols-2">
