@@ -1387,10 +1387,22 @@ export function createPatternPlan(config: OrderConfig): PatternPlan {
   });
 
   const totalViews = provisionalRuns.reduce((acc, run) => acc + run.views, 0);
-  const likesRatio = random(0.02, 0.03);
-  const sharesRatio = random(0.013, 0.022);
-  const savesRatio = random(0.003, 0.006);
-  const commentsRatio = random(0.0002, 0.0003); // 0.02%–0.03%
+
+  // 🔥 RATIO OVERRIDE: if user has set custom ratios from the Ratios page,
+  // use them directly (no randomization). Otherwise fall back to the
+  // original random natural-looking ranges.
+  const cr = config.customRatios;
+  const useCustomRatios = cr && (
+    cr.likes > 0 || cr.shares > 0 || cr.saves > 0 ||
+    cr.comments > 0 || cr.reposts > 0
+  );
+
+  const likesRatio = useCustomRatios ? (cr!.likes / 100) : random(0.02, 0.03);
+  const sharesRatio = useCustomRatios ? (cr!.shares / 100) : random(0.013, 0.022);
+  const savesRatio = useCustomRatios ? (cr!.saves / 100) : random(0.003, 0.006);
+  // commentsRatio kept for parity but not used (comments has its own bucket logic below)
+  const commentsRatio = useCustomRatios ? (cr!.comments / 100) : random(0.0002, 0.0003);
+  void commentsRatio;
 
   const likesTotal = config.includeLikes ? Math.max(10, Math.floor(totalViews * likesRatio)) : 0;
   const sharesTotal = config.includeShares ? Math.max(20, Math.floor(totalViews * sharesRatio)) : 0;
@@ -1398,7 +1410,12 @@ export function createPatternPlan(config: OrderConfig): PatternPlan {
   let commentsTotal = 0;
 
 if (config.includeComments) {
-  if (totalViews >= 50000) {
+  if (useCustomRatios) {
+    // 🔥 Custom comments ratio: still cap at a sane 200 to respect provider lists,
+    // but otherwise honor what the user set.
+    commentsTotal = Math.max(1, Math.min(200, Math.floor(totalViews * (cr!.comments / 100))));
+    if (commentsTotal < 1) commentsTotal = 1;
+  } else if (totalViews >= 50000) {
     commentsTotal = randomInt(30, 40);
   } else if (totalViews >= 40000) {
     commentsTotal = randomInt(25, 40);
@@ -1446,7 +1463,11 @@ if (config.includeComments) {
   ? distributeByViewsProportional(provisionalRuns, commentsTotal, 1)
   : viewRuns.map(() => 0);
 
-  const repostsTarget = config.includeReposts ? Math.max(10, Math.floor(likesTotal / 3)) : 0;
+  const repostsTarget = config.includeReposts
+    ? (useCustomRatios
+        ? Math.max(10, Math.floor(totalViews * (cr!.reposts / 100)))
+        : Math.max(10, Math.floor(likesTotal / 3)))
+    : 0;
   const repostsRuns = config.includeReposts
     ? spreadDistributionToEligibleRuns(provisionalRuns, repostEligibleIndexes, repostsTarget, 10, 12)
     : viewRuns.map(() => 0);
