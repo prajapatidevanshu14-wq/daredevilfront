@@ -5,11 +5,26 @@ import { BundlesPage } from "./pages/BundlesPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { NewOrderPage } from "./pages/NewOrderPage";
 import { OrdersPage } from "./pages/OrdersPage";
-import type { ApiPanel, Bundle, CreatedOrder, RunStatus } from "./types/order";
+import { RatiosPage } from "./pages/RatiosPage";
+import type {
+  ApiPanel,
+  Bundle,
+  CreatedOrder,
+  EngagementRatios,
+  RatioPreset,
+  RunStatus,
+} from "./types/order";
+import { DEFAULT_ENGAGEMENT_RATIOS } from "./types/order";
 import { fetchServices, updateOrderControl, fetchOrderStatus } from "./utils/api";
 import { cn } from "./utils/cn";
 
-type NavKey = "dashboard" | "new-order" | "orders" | "apis" | "bundles";
+type NavKey =
+  | "dashboard"
+  | "new-order"
+  | "orders"
+  | "apis"
+  | "bundles"
+  | "ratios";
 
 const NAV_ITEMS: { key: NavKey; label: string; icon: string }[] = [
   { key: "dashboard", label: "Dashboard", icon: "📊" },
@@ -17,6 +32,7 @@ const NAV_ITEMS: { key: NavKey; label: string; icon: string }[] = [
   { key: "orders", label: "Orders", icon: "📦" },
   { key: "apis", label: "APIs", icon: "🔗" },
   { key: "bundles", label: "Bundles", icon: "📁" },
+  { key: "ratios", label: "Ratios", icon: "⚖️" },
 ];
 
 const BATMAN_QUOTES = [
@@ -190,7 +206,8 @@ export default function App() {
       saved === "new-order" ||
       saved === "orders" ||
       saved === "apis" ||
-      saved === "bundles"
+      saved === "bundles" ||
+      saved === "ratios"
     ) {
       return saved;
     }
@@ -207,6 +224,15 @@ export default function App() {
   );
   const [bundles, setBundles] = useState<Bundle[]>(() =>
     hydrateBundles(readStorage<Bundle[]>("dev-smm-bundles", []))
+  );
+  const [activeRatios, setActiveRatios] = useState<EngagementRatios>(() =>
+    readStorage<EngagementRatios>(
+      "dev-smm-active-ratios",
+      DEFAULT_ENGAGEMENT_RATIOS
+    )
+  );
+  const [ratioPresets, setRatioPresets] = useState<RatioPreset[]>(() =>
+    readStorage<RatioPreset[]>("dev-smm-ratio-presets", [])
   );
   const [cloneSourceOrder, setCloneSourceOrder] = useState<CreatedOrder | null>(
     null
@@ -250,6 +276,16 @@ export default function App() {
   const persistBundles = useCallback((next: Bundle[]) => {
     setBundles(next);
     localStorage.setItem("dev-smm-bundles", JSON.stringify(next));
+  }, []);
+
+  const persistActiveRatios = useCallback((next: EngagementRatios) => {
+    setActiveRatios(next);
+    localStorage.setItem("dev-smm-active-ratios", JSON.stringify(next));
+  }, []);
+
+  const persistRatioPresets = useCallback((next: RatioPreset[]) => {
+    setRatioPresets(next);
+    localStorage.setItem("dev-smm-ratio-presets", JSON.stringify(next));
   }, []);
 
   const syncOrdersWithBackend = useCallback(
@@ -392,6 +428,7 @@ export default function App() {
           bundles={bundles}
           orders={orders}
           prefillOrder={cloneSourceOrder}
+          activeRatios={activeRatios}
           onCreateOrder={(order) =>
             persistOrders((prev) => [order, ...prev])
           }
@@ -589,6 +626,36 @@ export default function App() {
       );
     }
 
+    if (activePage === "ratios") {
+      return (
+        <RatiosPage
+          activeRatios={activeRatios}
+          presets={ratioPresets}
+          onSaveActive={(ratios) => persistActiveRatios(ratios)}
+          onResetActive={() => persistActiveRatios(DEFAULT_ENGAGEMENT_RATIOS)}
+          onSavePreset={(name, ratios) => {
+            const next: RatioPreset[] = [
+              {
+                id: `ratio-${Date.now()}`,
+                name,
+                ratios,
+                createdAt: new Date().toISOString(),
+              },
+              ...ratioPresets,
+            ];
+            persistRatioPresets(next);
+          }}
+          onDeletePreset={(id) => {
+            persistRatioPresets(ratioPresets.filter((p) => p.id !== id));
+          }}
+          onApplyPreset={(id) => {
+            const p = ratioPresets.find((x) => x.id === id);
+            if (p) persistActiveRatios(p.ratios);
+          }}
+        />
+      );
+    }
+
     return (
       <BundlesPage
         apis={apis}
@@ -651,6 +718,10 @@ export default function App() {
     persistApis,
     persistBundles,
     syncOrdersWithBackend,
+    activeRatios,
+    ratioPresets,
+    persistActiveRatios,
+    persistRatioPresets,
   ]);
 
   return (
