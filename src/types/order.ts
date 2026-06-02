@@ -33,6 +33,32 @@ export type QuickPatternPreset =
 
 export type RelativeCountMode = "auto" | "custom";
 
+// ============ ENGAGEMENT RATIOS ============
+// All values are percentages of TOTAL VIEWS (e.g. 2.5 means 2.5% of views)
+export interface EngagementRatios {
+  likes: number;
+  shares: number;
+  saves: number;
+  comments: number;
+  reposts: number;
+}
+
+// Defaults derived from original hard-coded patterns.ts logic
+export const DEFAULT_ENGAGEMENT_RATIOS: EngagementRatios = {
+  likes: 2.5,
+  shares: 1.75,
+  saves: 0.45,
+  comments: 0.05,
+  reposts: 0.85,
+};
+
+export interface RatioPreset {
+  id: string;
+  name: string;
+  ratios: EngagementRatios;
+  createdAt: string;
+}
+
 // ============ CONFIG TYPES ============
 export interface DeliveryOption {
   mode: "auto" | "preset" | "custom";
@@ -61,6 +87,8 @@ export interface OrderConfig {
   customSharesTotal?: number;
   customSavesTotal?: number;
   customRepostsTotal?: number;
+  // 🔥 NEW: optional custom engagement ratios (overrides defaults if set)
+  customRatios?: EngagementRatios | null;
 }
 
 // ============ RUN TYPES ============
