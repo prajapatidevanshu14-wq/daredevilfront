@@ -141,8 +141,28 @@ export function AdminPage() {
 
   const fireToast = (msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(""), 3000);
+    setTimeout(() => setToast(""), 6000);
   };
+
+  // 🔥 Properly unpack Supabase / unknown errors into a readable string
+  function describeError(e: unknown): string {
+    if (!e) return "Unknown error";
+    if (typeof e === "string") return e;
+    if (e instanceof Error) return e.message;
+    // Supabase returns objects like { message, details, hint, code }
+    const anyE = e as Record<string, unknown>;
+    const parts: string[] = [];
+    if (typeof anyE.message === "string") parts.push(anyE.message);
+    if (typeof anyE.details === "string") parts.push(`details: ${anyE.details}`);
+    if (typeof anyE.hint === "string") parts.push(`hint: ${anyE.hint}`);
+    if (typeof anyE.code === "string") parts.push(`code: ${anyE.code}`);
+    if (parts.length > 0) return parts.join(" — ");
+    try {
+      return JSON.stringify(e);
+    } catch {
+      return String(e);
+    }
+  }
 
   const loadKeys = async () => {
     setLoading(true);
@@ -155,10 +175,10 @@ export function AdminPage() {
       if (error) throw error;
       setKeys((data as AccessKeyRow[]) || []);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
       setLoadError(
-        `Could not load keys. Make sure the access_keys table has the new columns (duration_seconds, expires_at, note) and admin row-level read access. Details: ${msg}`
+        `Could not load keys. Make sure the access_keys table has the new columns (duration_seconds, expires_at, note) and admin row-level read access. Details: ${describeError(e)}`
       );
+      console.error("Load keys failed:", e);
     } finally {
       setLoading(false);
     }
@@ -217,8 +237,8 @@ export function AdminPage() {
       setNewNote("");
       await loadKeys();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      fireToast(`❌ ${msg}`);
+      fireToast(`❌ ${describeError(e)}`);
+      console.error("Create key failed:", e);
     } finally {
       setCreating(false);
     }
@@ -232,7 +252,7 @@ export function AdminPage() {
       .update({ is_active: false })
       .eq("key", k.key);
     if (error) {
-      fireToast(`❌ ${error.message}`);
+      fireToast(`❌ ${describeError(error)}`);
       return;
     }
     fireToast("🚫 Key revoked.");
@@ -246,7 +266,7 @@ export function AdminPage() {
       .update({ is_active: true })
       .eq("key", k.key);
     if (error) {
-      fireToast(`❌ ${error.message}`);
+      fireToast(`❌ ${describeError(error)}`);
       return;
     }
     fireToast("✅ Key reactivated.");
@@ -265,7 +285,7 @@ export function AdminPage() {
       .update({ fingerprint: null, activated_at: null, expires_at: null })
       .eq("key", k.key);
     if (error) {
-      fireToast(`❌ ${error.message}`);
+      fireToast(`❌ ${describeError(error)}`);
       return;
     }
     fireToast("🔄 Device unbound. Expiry timer also reset.");
@@ -284,7 +304,7 @@ export function AdminPage() {
       .update({ expires_at: newExp })
       .eq("key", k.key);
     if (error) {
-      fireToast(`❌ ${error.message}`);
+      fireToast(`❌ ${describeError(error)}`);
       return;
     }
     fireToast(`⏰ Extended by ${formatDuration(extraSeconds)}.`);
@@ -303,7 +323,7 @@ export function AdminPage() {
       .delete()
       .eq("key", k.key);
     if (error) {
-      fireToast(`❌ ${error.message}`);
+      fireToast(`❌ ${describeError(error)}`);
       return;
     }
     fireToast("🗑️ Key deleted.");
