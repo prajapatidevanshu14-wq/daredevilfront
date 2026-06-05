@@ -107,17 +107,17 @@ function BackendRunTable({ runs }: { runs: BackendRunInfo[] }) {
 
   const statusColors: Record<string, string> = {
     completed: "text-emerald-400",
-    failed: "text-red-400",
+    failed: "text-orange-400",     // 🔥 distinct from cancelled
     cancelled: "text-red-400",
     processing: "text-yellow-400",
     queued: "text-amber-400",
     pending: "text-gray-400",
-    paused: "text-orange-400",
+    paused: "text-orange-300",
   };
 
   const statusIcons: Record<string, string> = {
     completed: "✅",
-    failed: "❌",
+    failed: "⚠️",                 // 🔥 different icon — provider rejected
     cancelled: "🚫",
     processing: "⚡",
     queued: "⏳",
@@ -781,7 +781,9 @@ export function OrdersPage({
                                 {runStatus === "completed" ? (
                                   <span className="text-emerald-400">✅</span>
                                 ) : runStatus === "cancelled" ? (
-                                  <span className="text-red-400">🚫</span>
+                                  <span className="text-red-400" title="Cancelled">🚫</span>
+                                ) : runStatus === "failed" ? (
+                                  <span className="text-orange-400" title="Provider rejected">⚠️</span>
                                 ) : isPast ? (
                                   <span className="text-yellow-400">⚡</span>
                                 ) : (
@@ -1387,7 +1389,9 @@ export function OrdersPage({
                                     {runStatus === "completed" ? (
                                       <span className="text-emerald-400">✅</span>
                                     ) : runStatus === "cancelled" ? (
-                                      <span className="text-red-400">🚫</span>
+                                      <span className="text-red-400" title="Cancelled">🚫</span>
+                                    ) : runStatus === "failed" ? (
+                                      <span className="text-orange-400" title="Provider rejected">⚠️</span>
                                     ) : isPast ? (
                                       <span className="text-yellow-400">⚡</span>
                                     ) : (
@@ -1462,6 +1466,50 @@ export function OrdersPage({
           </button>
         </div>
       )}
+
+      {/* Status Legend */}
+      <div className="rounded-xl border border-yellow-500/15 bg-black/40 px-3 py-2 sm:px-4 sm:py-2.5">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] sm:text-xs">
+          <span className="font-semibold uppercase tracking-wider text-gray-500">
+            Run status:
+          </span>
+          <span className="flex items-center gap-1.5 text-emerald-400">
+            <span className="text-base">✅</span>
+            <span>
+              <b>Completed</b>
+              <span className="ml-1 text-gray-500">— delivered to provider</span>
+            </span>
+          </span>
+          <span className="flex items-center gap-1.5 text-yellow-400">
+            <span className="text-base">⚡</span>
+            <span>
+              <b>Processing</b>
+              <span className="ml-1 text-gray-500">— sending now</span>
+            </span>
+          </span>
+          <span className="flex items-center gap-1.5 text-gray-400">
+            <span className="text-base">🕐</span>
+            <span>
+              <b>Pending</b>
+              <span className="ml-1 text-gray-500">— waiting for scheduled time</span>
+            </span>
+          </span>
+          <span className="flex items-center gap-1.5 text-orange-400">
+            <span className="text-base">⚠️</span>
+            <span>
+              <b>Failed</b>
+              <span className="ml-1 text-gray-500">— provider rejected (see error)</span>
+            </span>
+          </span>
+          <span className="flex items-center gap-1.5 text-red-400">
+            <span className="text-base">🚫</span>
+            <span>
+              <b>Cancelled</b>
+              <span className="ml-1 text-gray-500">— stopped by you</span>
+            </span>
+          </span>
+        </div>
+      </div>
 
       {/* Tabs & Controls */}
       <div className="rounded-xl border border-yellow-500/20 bg-gradient-to-br from-gray-900 to-black p-3 sm:p-4">
