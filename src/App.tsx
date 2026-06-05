@@ -122,6 +122,7 @@ function hydrateOrderDates(orders: CreatedOrder[]): CreatedOrder[] {
           const next = order.runStatuses[index];
           return next === "completed" ||
             next === "cancelled" ||
+            next === "failed" ||
             next === "retrying"
             ? next
             : "pending";
@@ -329,7 +330,8 @@ export default function App() {
                 case "cancelled":
                   return "cancelled";
                 case "failed":
-                  return "cancelled";
+                  // 🔥 distinct from cancelled — provider rejected the run
+                  return "failed";
                 default:
                   return "pending";
               }
