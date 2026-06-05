@@ -1,62 +1,80 @@
-import { StrictMode } from "react";
+import { StrictMode, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.tsx";
 import { LoginPage } from "./pages/LoginPage.tsx";
+import { AdminPage } from "./pages/AdminPage.tsx";
 import { supabase } from "./lib/supabase.ts";
-import { useState, useEffect } from "react";
+
 const STORAGE_KEY = "gotham-access-key";
-const STORAGE_FP = "gotham-fingerprint";
+
+function useHash(): string {
+  const [hash, setHash] = useState<string>(
+    typeof window !== "undefined" ? window.location.hash : ""
+  );
+  useEffect(() => {
+    const onChange = () => setHash(window.location.hash);
+    window.addEventListener("hashchange", onChange);
+    return () => window.removeEventListener("hashchange", onChange);
+  }, []);
+  return hash;
+}
 
 function Root() {
+  const hash = useHash();
+  const isAdminRoute = hash === "#admin" || hash === "#/admin";
+
   const [authState, setAuthState] = useState<
     "loading" | "authenticated" | "unauthenticated"
   >("loading");
 
   useEffect(() => {
+    if (isAdminRoute) return; // admin page handles its own auth
     checkAuth();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdminRoute]);
 
-      const checkAuth = async () => {
+  const checkAuth = async () => {
     try {
       const savedKey = localStorage.getItem(STORAGE_KEY);
 
-      // No key in localStorage — show login
       if (!savedKey || !savedKey.trim()) {
         setAuthState("unauthenticated");
         return;
       }
 
-      // 🔥 Verify key still exists and is active in Supabase
-      // This catches: deleted keys, revoked keys
       const { data, error } = await supabase
         .from("access_keys")
-        .select("is_active")
+        .select("is_active, expires_at")
         .eq("key", savedKey)
         .single();
 
       if (error || !data || !data.is_active) {
-        // Key deleted or revoked — clear localStorage and block
         localStorage.removeItem(STORAGE_KEY);
         setAuthState("unauthenticated");
         return;
       }
 
-      // Key still valid — let them in
-      setAuthState("authenticated");
+      // 🔥 Expiry check
+      if (data.expires_at && Date.now() >= new Date(data.expires_at).getTime()) {
+        localStorage.removeItem(STORAGE_KEY);
+        setAuthState("unauthenticated");
+        return;
+      }
 
+      setAuthState("authenticated");
     } catch (err) {
       console.error("Auth check failed:", err);
-      // 🔥 On network error — still let them in
-      // Dont block users just because Supabase is slow
+      // Network error fallback — keep user in if they had a key
       const savedKey = localStorage.getItem(STORAGE_KEY);
-      if (savedKey && savedKey.trim().length > 0) {
-        setAuthState("authenticated");
-      } else {
-        setAuthState("unauthenticated");
-      }
+      setAuthState(savedKey && savedKey.trim() ? "authenticated" : "unauthenticated");
     }
   };
+
+  // ===== Admin route =====
+  if (isAdminRoute) {
+    return <AdminPage />;
+  }
 
   if (authState === "loading") {
     return (
@@ -73,9 +91,7 @@ function Root() {
   }
 
   if (authState === "unauthenticated") {
-    return (
-      <LoginPage onAuthenticated={() => setAuthState("authenticated")} />
-    );
+    return <LoginPage onAuthenticated={() => setAuthState("authenticated")} />;
   }
 
   return <App />;
