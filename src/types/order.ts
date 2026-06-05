@@ -1,5 +1,5 @@
 // ============ STATUS TYPES ============
-export type RunStatus = "pending" | "completed" | "cancelled" | "retrying";
+export type RunStatus = "pending" | "completed" | "cancelled" | "failed" | "retrying";
 
 export type OrderStatus =
   | "running"
