@@ -1,13 +1,24 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { supabase } from "../lib/supabase";
 import { getBrowserFingerprint } from "../lib/fingerprint";
 
 const STORAGE_KEY = "gotham-access-key";
-const STORAGE_FP = "gotham-fingerprint";
 
 interface LoginPageProps {
   onAuthenticated: () => void;
+}
+
+function formatRemaining(ms: number): string {
+  if (ms <= 0) return "expired";
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ${s % 60}s`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ${m % 60}m`;
+  const d = Math.floor(h / 24);
+  return `${d}d ${h % 24}h`;
 }
 
 export function LoginPage({ onAuthenticated }: LoginPageProps) {
@@ -15,14 +26,45 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [remainingMsg, setRemainingMsg] = useState("");
 
-  // 🔥 Auto-login: if key already saved in localStorage, go straight in
-  useState(() => {
+  // 🔥 Auto-login: if key already saved, validate it (including expiry) and let in
+  useEffect(() => {
     const savedKey = localStorage.getItem(STORAGE_KEY);
-    if (savedKey && savedKey.trim().length > 0) {
-      onAuthenticated();
-    }
-  });
+    if (!savedKey || !savedKey.trim()) return;
+
+    (async () => {
+      try {
+        const { data, error: fetchError } = await supabase
+          .from("access_keys")
+          .select("*")
+          .eq("key", savedKey)
+          .single();
+
+        if (fetchError || !data || !data.is_active) {
+          localStorage.removeItem(STORAGE_KEY);
+          return;
+        }
+
+        if (data.expires_at) {
+          const expMs = new Date(data.expires_at).getTime();
+          if (Date.now() >= expMs) {
+            localStorage.removeItem(STORAGE_KEY);
+            setError(
+              "Your access key has expired. Contact your administrator for a new one."
+            );
+            return;
+          }
+        }
+
+        // Verified — let in
+        onAuthenticated();
+      } catch {
+        // Network failure — fall back to localStorage (offline tolerance)
+        onAuthenticated();
+      }
+    })();
+  }, [onAuthenticated]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,10 +79,8 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
     setError("");
 
     try {
-      // Step 1: Get browser fingerprint
       const fingerprint = await getBrowserFingerprint();
 
-      // Step 2: Look up the key in Supabase
       const { data, error: fetchError } = await supabase
         .from("access_keys")
         .select("*")
@@ -53,22 +93,34 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
         return;
       }
 
-      // Step 3: Check if key is active
       if (!data.is_active) {
         setError("This key has been revoked. Contact your administrator.");
         setLoading(false);
         return;
       }
 
-      // Step 4: Check fingerprint
-            if (data.fingerprint === null) {
-        // 🔥 Key never used before — activate it ONE TIME ONLY
+      // ----- First-use path: bind fingerprint AND start the expiry clock -----
+      if (data.fingerprint === null) {
+        const activatedAt = new Date();
+        const updatePayload: Record<string, unknown> = {
+          fingerprint,
+          activated_at: activatedAt.toISOString(),
+        };
+
+        // duration_seconds is set by admin at key creation; null = lifetime
+        if (
+          typeof data.duration_seconds === "number" &&
+          data.duration_seconds > 0
+        ) {
+          const expiresAt = new Date(
+            activatedAt.getTime() + data.duration_seconds * 1000
+          );
+          updatePayload.expires_at = expiresAt.toISOString();
+        }
+
         const { error: updateError } = await supabase
           .from("access_keys")
-          .update({
-            fingerprint: fingerprint,
-            activated_at: new Date().toISOString(),
-          })
+          .update(updatePayload)
           .eq("key", trimmedKey);
 
         if (updateError) {
@@ -77,26 +129,39 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
           return;
         }
 
-        // 🔥 Save to localStorage — this is now the permanent access token
-        // User will never need to enter key again on this browser
         localStorage.setItem(STORAGE_KEY, trimmedKey);
 
-        setSuccess(true);
-        setTimeout(() => {
-          onAuthenticated();
-        }, 1500);
+        if (updatePayload.expires_at) {
+          const ms =
+            new Date(updatePayload.expires_at as string).getTime() - Date.now();
+          setRemainingMsg(`Valid for ${formatRemaining(ms)}`);
+        } else {
+          setRemainingMsg("Lifetime access");
+        }
 
-      } else {
-        // 🔥 Key already used (fingerprint is set) — BLOCK completely
-        // Even same browser — key was already consumed
-        // User should already have it in localStorage if they used it here
-        setError(
-          "This key has already been used. Each key is single-use only. If this is your browser, access should be automatic."
-        );
-        setLoading(false);
+        setSuccess(true);
+        setTimeout(() => onAuthenticated(), 1500);
         return;
       }
 
+      // ----- Returning use path: fingerprint already set -----
+      // For now we keep your original behavior (single-device lock).
+      // But also check expiry here in case admin imported a pre-bound key.
+      if (data.expires_at) {
+        const expMs = new Date(data.expires_at).getTime();
+        if (Date.now() >= expMs) {
+          setError(
+            "This key has expired. Contact your administrator for a new one."
+          );
+          setLoading(false);
+          return;
+        }
+      }
+
+      setError(
+        "This key has already been used. Each key is single-use only. If this is your browser, access should be automatic."
+      );
+      setLoading(false);
     } catch (err) {
       console.error("Login error:", err);
       setError("Something went wrong. Try again.");
@@ -106,7 +171,6 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center px-4">
-      {/* Background effect */}
       <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-black to-gray-950" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-yellow-500/5 via-transparent to-transparent" />
 
@@ -116,7 +180,6 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
         transition={{ duration: 0.5 }}
         className="relative w-full max-w-md"
       >
-        {/* Logo */}
         <div className="text-center mb-8">
           <motion.div
             initial={{ scale: 0.8 }}
@@ -147,7 +210,6 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
           </motion.div>
         </div>
 
-        {/* Card */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -167,6 +229,9 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
               <p className="mt-1 text-sm text-gray-500">
                 Welcome to Gotham Command...
               </p>
+              {remainingMsg && (
+                <p className="mt-2 text-xs text-yellow-500">{remainingMsg}</p>
+              )}
             </motion.div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -220,7 +285,6 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
           )}
         </motion.div>
 
-        {/* Bottom quote */}
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
