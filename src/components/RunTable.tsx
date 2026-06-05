@@ -6,13 +6,14 @@ type ExtendedRunStatus =
   | "pending"
   | "completed"
   | "cancelled"
+  | "failed"
   | "retrying"
   | "executing"
   | "timeout";
 
 interface RunTableProps {
   runs: RunStep[];
-  runStatuses?: Array<"pending" | "completed" | "cancelled" | "retrying">;
+  runStatuses?: Array<"pending" | "completed" | "cancelled" | "failed" | "retrying">;
   runErrors?: string[];
   runRetries?: number[];
   runOriginalTimes?: string[];
@@ -55,6 +56,12 @@ const STATUS_CONFIG: Record<
     color: "text-red-400",
     bg: "bg-red-500/20",
     icon: "❌",
+  },
+  failed: {
+    label: "Failed",
+    color: "text-orange-400",
+    bg: "bg-orange-500/20",
+    icon: "⚠️",
   },
   timeout: {
     label: "Timeout",
@@ -108,6 +115,7 @@ export function RunTable({
     const reason = safeRunReasons[index];
 
     if (status === "cancelled") return "cancelled";
+    if (status === "failed") return "failed";
     if (status === "completed") return "completed";
     if (reason?.toLowerCase().includes("timeout")) return "timeout";
     if (status === "retrying" || retryCount > 0) return "retrying";
@@ -147,6 +155,7 @@ export function RunTable({
       retrying: safeRunStatuses.filter((s) => s === "retrying").length,
       pending: safeRunStatuses.filter((s) => s === "pending").length,
       cancelled: safeRunStatuses.filter((s) => s === "cancelled").length,
+      failed: safeRunStatuses.filter((s) => s === "failed").length,
       totalRetries: safeRunRetries.reduce((sum, r) => sum + (r || 0), 0),
     };
   }, [safeRuns, safeRunStatuses, safeRunRetries]);
@@ -224,6 +233,11 @@ export function RunTable({
               ❌ {stats.cancelled} cancelled
             </span>
           )}
+          {stats.failed > 0 && (
+            <span className="rounded-full bg-orange-500/20 px-2 py-0.5 text-orange-400">
+              ⚠️ {stats.failed} failed
+            </span>
+          )}
           {stats.totalRetries > 0 && (
             <span className="rounded-full bg-orange-500/20 px-2 py-0.5 text-orange-400">
               ↻ {stats.totalRetries} total retries
@@ -267,6 +281,8 @@ export function RunTable({
                       ? "bg-yellow-500/5"
                       : status === "cancelled"
                       ? "bg-red-500/5"
+                      : status === "failed"
+                      ? "bg-orange-500/5"
                       : status === "completed"
                       ? "bg-emerald-500/5"
                       : "hover:bg-yellow-500/5"
