@@ -6,7 +6,7 @@ import { LoginPage } from "./pages/LoginPage.tsx";
 import { AdminPage } from "./pages/AdminPage.tsx";
 
 
-function useHash(): string {
+function useHash(): string { 
   const [hash, setHash] = useState<string>(
     typeof window !== "undefined" ? window.location.hash : ""
   );
