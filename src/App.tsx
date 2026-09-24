@@ -17,6 +17,7 @@ import type {
 import { DEFAULT_ENGAGEMENT_RATIOS } from "./types/order";
 import { fetchServices, updateOrderControl, fetchOrderStatus } from "./utils/api";
 import { cn } from "./utils/cn";
+import { scheduleCloudSave } from "./lib/cloud";
 
 type NavKey =
   | "dashboard"
@@ -259,11 +260,13 @@ export default function App() {
         setOrders((prev) => {
           const updated = next(prev);
           localStorage.setItem("dev-smm-orders", JSON.stringify(updated));
+          scheduleCloudSave({ orders: updated });
           return updated;
         });
       } else {
         setOrders(next);
         localStorage.setItem("dev-smm-orders", JSON.stringify(next));
+        scheduleCloudSave({ orders: next });
       }
     },
     []
@@ -272,21 +275,25 @@ export default function App() {
   const persistApis = useCallback((next: ApiPanel[]) => {
     setApis(next);
     localStorage.setItem("dev-smm-apis", JSON.stringify(next));
+    scheduleCloudSave({ apis: next });
   }, []);
 
   const persistBundles = useCallback((next: Bundle[]) => {
     setBundles(next);
     localStorage.setItem("dev-smm-bundles", JSON.stringify(next));
+    scheduleCloudSave({ bundles: next });
   }, []);
 
   const persistActiveRatios = useCallback((next: EngagementRatios) => {
     setActiveRatios(next);
     localStorage.setItem("dev-smm-active-ratios", JSON.stringify(next));
+    scheduleCloudSave({ activeRatios: next });
   }, []);
 
   const persistRatioPresets = useCallback((next: RatioPreset[]) => {
     setRatioPresets(next);
     localStorage.setItem("dev-smm-ratio-presets", JSON.stringify(next));
+    scheduleCloudSave({ ratioPresets: next });
   }, []);
 
   const syncOrdersWithBackend = useCallback(
