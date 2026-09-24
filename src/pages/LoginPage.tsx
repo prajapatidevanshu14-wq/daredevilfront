@@ -1,9 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { supabase } from "../lib/supabase";
 import { getBrowserFingerprint } from "../lib/fingerprint";
-
-const STORAGE_KEY = "gotham-access-key";
+import {
+  applyCloudData,
+  getLocalDataForMigration,
+  loginWithAccessKey,
+  saveCloudPatchNow,
+  setCloudSession,
+} from "../lib/cloud";
 
 interface LoginPageProps {
   onAuthenticated: () => void;
@@ -28,44 +32,6 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
   const [success, setSuccess] = useState(false);
   const [remainingMsg, setRemainingMsg] = useState("");
 
-  // 🔥 Auto-login: if key already saved, validate it (including expiry) and let in
-  useEffect(() => {
-    const savedKey = localStorage.getItem(STORAGE_KEY);
-    if (!savedKey || !savedKey.trim()) return;
-
-    (async () => {
-      try {
-        const { data, error: fetchError } = await supabase
-          .from("access_keys")
-          .select("*")
-          .eq("key", savedKey)
-          .single();
-
-        if (fetchError || !data || !data.is_active) {
-          localStorage.removeItem(STORAGE_KEY);
-          return;
-        }
-
-        if (data.expires_at) {
-          const expMs = new Date(data.expires_at).getTime();
-          if (Date.now() >= expMs) {
-            localStorage.removeItem(STORAGE_KEY);
-            setError(
-              "Your access key has expired. Contact your administrator for a new one."
-            );
-            return;
-          }
-        }
-
-        // Verified — let in
-        onAuthenticated();
-      } catch {
-        // Network failure — fall back to localStorage (offline tolerance)
-        onAuthenticated();
-      }
-    })();
-  }, [onAuthenticated]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedKey = keyInput.trim().toUpperCase();
@@ -80,91 +46,34 @@ export function LoginPage({ onAuthenticated }: LoginPageProps) {
 
     try {
       const fingerprint = await getBrowserFingerprint();
+      const result = await loginWithAccessKey(trimmedKey, fingerprint);
 
-      const { data, error: fetchError } = await supabase
-        .from("access_keys")
-        .select("*")
-        .eq("key", trimmedKey)
-        .single();
-
-      if (fetchError || !data) {
-        setError("Invalid access key. Contact your administrator.");
-        setLoading(false);
-        return;
-      }
-
-      if (!data.is_active) {
-        setError("This key has been revoked. Contact your administrator.");
-        setLoading(false);
-        return;
-      }
-
-      // ----- First-use path: bind fingerprint AND start the expiry clock -----
-      if (data.fingerprint === null) {
-        const activatedAt = new Date();
-        const updatePayload: Record<string, unknown> = {
-          fingerprint,
-          activated_at: activatedAt.toISOString(),
+      if (!result.success || !result.session_token) {
+        const messages: Record<string, string> = {
+          INVALID_KEY: "Invalid access key. Check the key and try again.",
+          REVOKED: "This key has been revoked. Contact your administrator.",
+          EXPIRED: "This key has expired. Contact your administrator.",
+          WRONG_DEVICE: "This key is locked to another device. Ask the administrator to reset its device.",
         };
-
-        // duration_seconds is set by admin at key creation; null = lifetime
-        if (
-          typeof data.duration_seconds === "number" &&
-          data.duration_seconds > 0
-        ) {
-          const expiresAt = new Date(
-            activatedAt.getTime() + data.duration_seconds * 1000
-          );
-          updatePayload.expires_at = expiresAt.toISOString();
-        }
-
-        const { error: updateError } = await supabase
-          .from("access_keys")
-          .update(updatePayload)
-          .eq("key", trimmedKey);
-
-        if (updateError) {
-          setError("Activation failed. Try again.");
-          setLoading(false);
-          return;
-        }
-
-        localStorage.setItem(STORAGE_KEY, trimmedKey);
-
-        if (updatePayload.expires_at) {
-          const ms =
-            new Date(updatePayload.expires_at as string).getTime() - Date.now();
-          setRemainingMsg(`Valid for ${formatRemaining(ms)}`);
-        } else {
-          setRemainingMsg("Lifetime access");
-        }
-
-        setSuccess(true);
-        setTimeout(() => onAuthenticated(), 1500);
+        setError(messages[result.error || ""] || "Login failed. Please try again.");
+        setLoading(false);
         return;
       }
 
-      // ----- Returning use path: fingerprint already set -----
-      // For now we keep your original behavior (single-device lock).
-      // But also check expiry here in case admin imported a pre-bound key.
-      if (data.expires_at) {
-        const expMs = new Date(data.expires_at).getTime();
-        if (Date.now() >= expMs) {
-          setError(
-            "This key has expired. Contact your administrator for a new one."
-          );
-          setLoading(false);
-          return;
-        }
+      setCloudSession(result.session_token);
+      if (result.has_cloud_data) {
+        applyCloudData(result.cloud_data);
+      } else {
+        // One-time migration: preserve this customer's existing browser data.
+        await saveCloudPatchNow(getLocalDataForMigration());
       }
 
-      setError(
-        "This key has already been used. Each key is single-use only. If this is your browser, access should be automatic."
-      );
-      setLoading(false);
+      setRemainingMsg("Your data is connected to cloud storage");
+      setSuccess(true);
+      setTimeout(() => onAuthenticated(), 700);
     } catch (err) {
       console.error("Login error:", err);
-      setError("Something went wrong. Try again.");
+      setError("Cannot connect to cloud storage. Check your internet and try again.");
       setLoading(false);
     }
   };
