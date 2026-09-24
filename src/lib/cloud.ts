@@ -42,8 +42,11 @@ export function applyCloudData(data: Record<string, unknown> | null | undefined)
     ratioPresets: "dev-smm-ratio-presets",
   };
   for (const [cloudKey, localKey] of Object.entries(mapping)) {
-    if (data[cloudKey] !== undefined) {
+    // Old browser data may contain null. Never replace safe app defaults with null.
+    if (data[cloudKey] !== undefined && data[cloudKey] !== null) {
       localStorage.setItem(localKey, JSON.stringify(data[cloudKey]));
+    } else if (data[cloudKey] === null) {
+      localStorage.removeItem(localKey);
     }
   }
 }
